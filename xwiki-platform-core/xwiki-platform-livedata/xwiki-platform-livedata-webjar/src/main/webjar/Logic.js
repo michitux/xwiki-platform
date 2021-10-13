@@ -106,21 +106,8 @@ define('xwiki-livedata', [
     this.element = element;
     this.data = JSON.parse(element.getAttribute("data-config") || "{}");
     if(this.data.entries) {
-      // Calling Object.freeze(undefined) on IE11 triggers an exception. 
+      // Calling Object.freeze(undefined) on IE11 triggers an exception.
       this.data.entries = Object.freeze(this.data.entries);
-    }
-    // Fetch the data if we don't have any. This call must be made as soon as possible to display the data to the user
-    // early.
-    // We use a dedicated field for the first load as the fetch start/end events can be triggered before the loader 
-    // components is loaded (and in this case the loader is never hidden even once the entries are displayed).
-    this.firstEntriesLoading = true;
-    if (!this.data.data.entries.length) {
-      this.updateEntries()
-        // Marks the loaded as finish, even if it fails as the loader should stop and an message be displayed to the 
-        // user in this case.
-        .finally(() => this.firstEntriesLoading = false);
-    } else {
-      this.firstEntriesLoading = false;
     }
     this.currentLayoutId = "";
     this.changeLayout(this.data.meta.defaultLayout);
@@ -238,6 +225,11 @@ define('xwiki-livedata', [
       // Make sure that the translations are loaded from the server before translating.
       await translationsPromise;
       return vue.$t(key, args);
+    }
+
+    // Fetch the data if we don't have any.
+    if (!this.data.data.entries.length) {
+      this.updateEntries();
     }
   };
 
