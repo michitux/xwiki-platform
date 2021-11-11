@@ -115,6 +115,13 @@ public class OfficeHTMLCleaner implements HTMLCleaner
     @Named("officeimporter/linebreak")
     private HTMLFilter lineBreakFilter;
 
+    /**
+     * {@link HTMLFilter} for filtering paragraphs.
+     */
+    @Inject
+    @Named("officeimporter/paragraphnumbering")
+    private HTMLFilter paragraphNumberingFilter;
+
     @Override
     public Document clean(Reader originalHtmlContent)
     {
@@ -137,7 +144,7 @@ public class OfficeHTMLCleaner implements HTMLCleaner
         HTMLCleanerConfiguration configuration = this.defaultHtmlCleaner.getDefaultConfiguration();
 
         // Add office cleaning filters after the default filters.
-        List<HTMLFilter> filters = new ArrayList<HTMLFilter>(configuration.getFilters());
+        List<HTMLFilter> filters = new ArrayList<>(configuration.getFilters());
         filters.addAll(Arrays.asList(
             this.stripperFilter,
             this.styleFilter,
@@ -147,7 +154,8 @@ public class OfficeHTMLCleaner implements HTMLCleaner
             this.anchorFilter,
             this.listFilter,
             this.tableFilter,
-            this.lineBreakFilter));
+            this.lineBreakFilter,
+            this.paragraphNumberingFilter));
         configuration.setFilters(filters);
 
         return configuration;

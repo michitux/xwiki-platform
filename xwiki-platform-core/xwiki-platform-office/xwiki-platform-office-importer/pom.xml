@@ -33,7 +33,7 @@
   <properties>
     <!-- Skipping revapi since xwiki-platform-legacy-office-importer wraps this module and runs checks on it -->
     <xwiki.revapi.skip>true</xwiki.revapi.skip>
-    <xwiki.jacoco.instructionRatio>0.63</xwiki.jacoco.instructionRatio>
+    <xwiki.jacoco.instructionRatio>0.58</xwiki.jacoco.instructionRatio>
     <jodconverter.version>4.4.2</jodconverter.version>
   </properties>
   <dependencies>
@@ -147,11 +147,12 @@
     </dependency>
     <!-- Needed, as otherwise mockito fails with a NPE (checker-qual brings the @NonNull annotation used in
          JODConverter's LocalConverter class and if not present at runtime it makes Mockito fail), see
-         https://github.com/sbraconnier/jodconverter/issues/264 -->
+         https://github.com/sbraconnier/jodconverter/issues/264
+         Also needed for the JODConverter filter implementation.
+          -->
     <dependency>
       <groupId>org.checkerframework</groupId>
       <artifactId>checker-qual</artifactId>
-      <scope>test</scope>
     </dependency>
   </dependencies>
   <build>

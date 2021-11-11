@@ -29,6 +29,7 @@ import org.jodconverter.core.document.JsonDocumentFormatRegistry;
 import org.jodconverter.core.office.OfficeManager;
 import org.jodconverter.local.LocalConverter;
 import org.jodconverter.local.filter.text.LinkedImagesEmbedderFilter;
+import org.jodconverter.local.filter.text.TextReplacerFilter;
 import org.jodconverter.local.office.ExternalOfficeManager;
 import org.jodconverter.local.office.LocalOfficeManager;
 import org.slf4j.Logger;
@@ -145,12 +146,19 @@ public class DefaultOfficeServer implements OfficeServer
 
         this.jodConverter = null;
 
+        String[] tabArray = {"\t"};
+        String[] tabReplacementArray = {"[[TAB]]"};
+
         // Try to use the JSON document format registry to configure the office document conversion.
         try (InputStream input = getClass().getResourceAsStream(DOCUMENT_FORMATS_PATH)) {
             if (input != null) {
                 this.jodConverter = LocalConverter.builder().officeManager(this.jodManager)
                     .formatRegistry(JsonDocumentFormatRegistry.create(input))
-                    .filterChain(new LinkedImagesEmbedderFilter()).build();
+                    .filterChain(
+                        new LinkedImagesEmbedderFilter(),
+                        new XWikiLibreOfficeFilter(),
+                        new TextReplacerFilter(tabArray, tabReplacementArray)
+                    ).build();
             } else {
                 this.logger.debug("{} is missing. The default document format registry will be used instead.",
                     DOCUMENT_FORMATS_PATH);
@@ -163,7 +171,11 @@ public class DefaultOfficeServer implements OfficeServer
         if (this.jodConverter == null) {
             // Use the default document format registry.
             this.jodConverter = LocalConverter.builder().officeManager(this.jodManager)
-                .filterChain(new LinkedImagesEmbedderFilter()).build();
+                .filterChain(
+                    new LinkedImagesEmbedderFilter(),
+                    new XWikiLibreOfficeFilter(),
+                    new TextReplacerFilter(tabArray, tabReplacementArray)
+                ).build();
         }
 
         File workDir = this.environment.getTemporaryDirectory();
