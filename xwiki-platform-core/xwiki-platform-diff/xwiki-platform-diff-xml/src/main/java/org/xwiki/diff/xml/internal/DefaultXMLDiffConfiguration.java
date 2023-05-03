@@ -24,39 +24,44 @@ import javax.inject.Named;
 import javax.inject.Singleton;
 
 import org.xwiki.component.annotation.Component;
-import org.xwiki.component.manager.ComponentLookupException;
-import org.xwiki.component.manager.ComponentManager;
-import org.xwiki.diff.DiffException;
+import org.xwiki.configuration.ConfigurationSource;
 import org.xwiki.diff.xml.XMLDiffConfiguration;
 
 /**
- * Default implementation of {@link DataURIConverter}, uses the configured one.
+ * Configuration for the XML diff.
  *
  * @version $Id$
- * @since 11.10.1
- * @since 12.0RC1
  */
 @Component
 @Singleton
-public class DefaultDataURIConverter implements DataURIConverter
+public class DefaultXMLDiffConfiguration implements XMLDiffConfiguration
 {
-    @Inject
-    @Named("context")
-    private ComponentManager componentManager;
+    private static final String PREFIX = "diff.xml";
 
     @Inject
-    private XMLDiffConfiguration configuration;
+    @Named("xwikiproperties")
+    private ConfigurationSource configurationSource;
 
     @Override
-    public String convert(String url) throws DiffException
+    public int getHttpTimeout()
     {
-        try {
-            DataURIConverter converter =
-                this.componentManager.getInstance(DataURIConverter.class, this.configuration.getDataURIConverterHint());
-            return converter.convert(url);
-        } catch (ComponentLookupException e) {
-            throw new DiffException(String.format("Failed to find a data URI converter for hint [%s].",
-                this.configuration.getDataURIConverterHint()), e);
-        }
+        return this.configurationSource.getProperty(getFullKeyName("httpTimeout"), Integer.class, 10);
+    }
+
+    @Override
+    public long getMaximumDataURISize()
+    {
+        return this.configurationSource.getProperty(getFullKeyName("maximumDataURISize"), Long.class, 1024L * 1024L);
+    }
+
+    @Override
+    public String getDataURIConverterHint()
+    {
+        return this.configurationSource.getProperty(getFullKeyName("dataURIConverterHint"), String.class, "attachment");
+    }
+
+    private String getFullKeyName(String shortKeyName)
+    {
+        return String.format("%s.%s", PREFIX, shortKeyName);
     }
 }
