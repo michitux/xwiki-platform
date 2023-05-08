@@ -28,6 +28,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.openqa.selenium.By;
+import org.openqa.selenium.WebElement;
 import org.xwiki.flamingo.skin.test.po.AttachmentsPane;
 import org.xwiki.flamingo.skin.test.po.AttachmentsViewPage;
 import org.xwiki.model.reference.AttachmentReference;
@@ -38,15 +39,17 @@ import org.xwiki.test.docker.junit5.TestReference;
 import org.xwiki.test.docker.junit5.UITest;
 import org.xwiki.test.ui.TestUtils;
 import org.xwiki.test.ui.po.BasePage;
-import org.xwiki.test.ui.po.ChangesPane;
 import org.xwiki.test.ui.po.ComparePage;
 import org.xwiki.test.ui.po.DeletePageOutcomePage;
 import org.xwiki.test.ui.po.HistoryPane;
 import org.xwiki.test.ui.po.ViewPage;
 import org.xwiki.test.ui.po.diff.DocumentDiffSummary;
 import org.xwiki.test.ui.po.diff.EntityDiff;
+import org.xwiki.test.ui.po.diff.RawChanges;
+import org.xwiki.test.ui.po.diff.RenderedChanges;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -217,41 +220,41 @@ class AttachmentIT
         HistoryPane historyPane = viewPage.openHistoryDocExtraPane();
         ComparePage compare = historyPane.compare("1.1", "2.1");
 
-        ChangesPane changesPane = compare.getChangesPane();
-        DocumentDiffSummary diffSummary = changesPane.getDiffSummary();
+        RawChanges rawChanges = compare.getChangesPane().getRawChanges();
+        DocumentDiffSummary diffSummary = rawChanges.getDiffSummary();
         assertEquals(Collections.singletonList("toto.txt"),
             diffSummary.toggleAttachmentsDetails().getAddedAttachments());
-        EntityDiff content = changesPane.getEntityDiff("toto.txt");
+        EntityDiff content = rawChanges.getEntityDiff("toto.txt");
         assertEquals(Arrays.asList("@@ -1,0 +1,1 @@", "+v1.1"), content.getDiff("Content"));
 
         viewPage = setup.gotoPage(testReference);
         historyPane = viewPage.openHistoryDocExtraPane();
         compare = historyPane.compare("2.1", "3.1");
-        changesPane = compare.getChangesPane();
-        diffSummary = changesPane.getDiffSummary();
+        rawChanges = compare.getChangesPane().getRawChanges();
+        diffSummary = rawChanges.getDiffSummary();
         assertEquals(Collections.singletonList("toto.txt"),
             diffSummary.toggleAttachmentsDetails().getRemovedAttachments());
-        content = changesPane.getEntityDiff("toto.txt");
+        content = rawChanges.getEntityDiff("toto.txt");
         assertEquals(Arrays.asList("@@ -1,1 +1,0 @@", "-v1.1"), content.getDiff("Content"));
 
         viewPage = setup.gotoPage(testReference);
         historyPane = viewPage.openHistoryDocExtraPane();
         compare = historyPane.compare("5.1", "7.1");
-        changesPane = compare.getChangesPane();
-        diffSummary = changesPane.getDiffSummary();
+        rawChanges = compare.getChangesPane().getRawChanges();
+        diffSummary = rawChanges.getDiffSummary();
         assertEquals(Collections.singletonList("toto.txt"),
             diffSummary.toggleAttachmentsDetails().getRemovedAttachments());
-        content = changesPane.getEntityDiff("toto.txt");
+        content = rawChanges.getEntityDiff("toto.txt");
         assertEquals(Arrays.asList("@@ -1,1 +1,0 @@", "-v2.2"), content.getDiff("Content"));
 
         viewPage = setup.gotoPage(testReference);
         historyPane = viewPage.openHistoryDocExtraPane();
         compare = historyPane.compare("2.1", "6.1");
-        changesPane = compare.getChangesPane();
-        diffSummary = changesPane.getDiffSummary();
+        rawChanges = compare.getChangesPane().getRawChanges();
+        diffSummary = rawChanges.getDiffSummary();
         assertEquals(Collections.singletonList("toto.txt"),
             diffSummary.toggleAttachmentsDetails().getModifiedAttachments());
-        content = changesPane.getEntityDiff("toto.txt");
+        content = rawChanges.getEntityDiff("toto.txt");
         assertEquals(Arrays.asList("@@ -1,1 +1,1 @@", "-v<del>1</del>.<del>1</del>", "+v<ins>2</ins>.<ins>3</ins>"),
             content.getDiff("Content"));
 
@@ -445,6 +448,60 @@ class AttachmentIT
                 + "Failed to delete attachment %s\n"
                 + "This attachment does not exist.", attachmentName),
                 basePage.getXWikiMessageContent());
+    }
+
+    @Test
+    @Order(9)
+    void compareRenderedImageChanges(TestUtils setup, TestReference testReference) throws Exception
+    {
+        setup.loginAsSuperAdmin();
+        setup.attachFile(testReference, "image.gif",
+            getClass().getResourceAsStream("/AttachmentIT/image.gif"), false);
+        // Upload the image a second time under a different name to check that the content and not the URL is used
+        // for comparison when changing the URL to the second image.
+        setup.attachFile(testReference, "image2.gif",
+            getClass().getResourceAsStream("/AttachmentIT/image.gif"), false);
+        ViewPage viewPage = setup.createPage(testReference, "[[image:image.gif]]");
+        String firstRevision = viewPage.getMetaDataValue("version");
+        // Create a second revision with the new image.
+        viewPage = setup.createPage(testReference, "[[image:image2.gif]]");
+        String secondRevision = viewPage.getMetaDataValue("version");
+
+        // Open the history pane.
+        HistoryPane historyPane = viewPage.openHistoryDocExtraPane();
+        ComparePage compare = historyPane.compare(firstRevision, secondRevision);
+        RenderedChanges renderedChanges = compare.getChangesPane().getRenderedChanges();
+        assertTrue(renderedChanges.hasNoChanges());
+
+        // Upload a new image with different content to verify that the changes are detected.
+        setup.attachFile(testReference, "image.png",
+            getClass().getResourceAsStream("/AttachmentIT/SmallSizeAttachment.png"), false);
+
+        // Create a third revision with the new image.
+        viewPage = setup.createPage(testReference, "[[image:image.png]]");
+        String thirdRevision = viewPage.getMetaDataValue("version");
+
+        // Open the history pane.
+        historyPane = viewPage.openHistoryDocExtraPane();
+        compare = historyPane.compare(secondRevision, thirdRevision);
+        renderedChanges = compare.getChangesPane().getRenderedChanges();
+        assertFalse(renderedChanges.hasNoChanges());
+        List<WebElement> changes = renderedChanges.getChangedBlocks();
+        assertEquals(2, changes.size());
+
+        // Check that the first change is the deletion and the second change the insertion of the new image.
+        WebElement firstChange = changes.get(0);
+        WebElement secondChange = changes.get(1);
+        assertEquals("deleted", firstChange.getAttribute("data-xwiki-html-diff-block"));
+        assertEquals("inserted", secondChange.getAttribute("data-xwiki-html-diff-block"));
+        WebElement deletedImage = firstChange.findElement(By.tagName("img"));
+        WebElement insertedImage = secondChange.findElement(By.tagName("img"));
+        assertEquals("image2.gif", deletedImage.getAttribute("alt"));
+        assertEquals("image.png", insertedImage.getAttribute("alt"));
+
+        // Check that both images are base64-encoded.
+        assertTrue(deletedImage.getAttribute("src").startsWith("data:image/gif;base64,"));
+        assertTrue(insertedImage.getAttribute("src").startsWith("data:image/png;base64,"));
     }
 
     private String getAttachmentsMacroContent(DocumentReference docRef)
