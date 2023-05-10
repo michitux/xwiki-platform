@@ -27,7 +27,7 @@ import org.xwiki.component.annotation.Component;
 import org.xwiki.component.manager.ComponentLookupException;
 import org.xwiki.component.manager.ComponentManager;
 import org.xwiki.diff.DiffException;
-import org.xwiki.diff.xml.XMLDiffConfiguration;
+import org.xwiki.diff.xml.XMLDiffDataURIConverterConfiguration;
 
 /**
  * Default implementation of {@link DataURIConverter}, uses the configured one.
@@ -45,7 +45,7 @@ public class DefaultDataURIConverter implements DataURIConverter
     private ComponentManager componentManager;
 
     @Inject
-    private XMLDiffConfiguration configuration;
+    private XMLDiffDataURIConverterConfiguration configuration;
 
     @Override
     public String convert(String url) throws DiffException

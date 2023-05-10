@@ -44,7 +44,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.xwiki.diff.xml.XMLDiffConfiguration;
+import org.xwiki.diff.xml.XMLDiffDataURIConverterConfiguration;
 import org.xwiki.test.junit5.mockito.ComponentTest;
 import org.xwiki.test.junit5.mockito.InjectMockComponents;
 import org.xwiki.test.junit5.mockito.MockComponent;
@@ -81,7 +81,7 @@ class ImageDownloaderTest
     private Provider<XWikiContext> xwikiContextProvider;
 
     @MockComponent
-    private XMLDiffConfiguration configuration;
+    private XMLDiffDataURIConverterConfiguration configuration;
 
     @InjectMockComponents
     private ImageDownloader imageDownloader;

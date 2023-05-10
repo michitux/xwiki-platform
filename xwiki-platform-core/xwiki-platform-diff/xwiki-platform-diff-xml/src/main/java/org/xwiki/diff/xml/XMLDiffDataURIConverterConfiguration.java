@@ -32,7 +32,7 @@ import org.xwiki.stability.Unstable;
  */
 @Unstable
 @Role
-public interface XMLDiffConfiguration
+public interface XMLDiffDataURIConverterConfiguration
 {
     /**
      * @return the timeout to use when fetching data from the web to embed as data URI

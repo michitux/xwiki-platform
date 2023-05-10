@@ -42,7 +42,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.cookie.BasicClientCookie;
 import org.xwiki.component.annotation.Component;
-import org.xwiki.diff.xml.XMLDiffConfiguration;
+import org.xwiki.diff.xml.XMLDiffDataURIConverterConfiguration;
 
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.web.XWikiRequest;
@@ -65,7 +65,7 @@ public class ImageDownloader
     private Provider<XWikiContext> xcontextProvider;
 
     @Inject
-    private XMLDiffConfiguration configuration;
+    private XMLDiffDataURIConverterConfiguration configuration;
 
     /**
      * The result of a download request.

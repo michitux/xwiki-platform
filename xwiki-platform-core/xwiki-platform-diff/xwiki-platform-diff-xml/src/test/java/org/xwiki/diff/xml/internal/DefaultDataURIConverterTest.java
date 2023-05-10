@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.xwiki.component.manager.ComponentLookupException;
 import org.xwiki.component.manager.ComponentManager;
 import org.xwiki.diff.DiffException;
-import org.xwiki.diff.xml.XMLDiffConfiguration;
+import org.xwiki.diff.xml.XMLDiffDataURIConverterConfiguration;
 import org.xwiki.test.junit5.mockito.ComponentTest;
 import org.xwiki.test.junit5.mockito.InjectMockComponents;
 import org.xwiki.test.junit5.mockito.MockComponent;
@@ -58,7 +58,7 @@ class DefaultDataURIConverterTest
     private DataURIConverter httpDataURIConverter;
 
     @MockComponent
-    private XMLDiffConfiguration configuration;
+    private XMLDiffDataURIConverterConfiguration configuration;
 
     @MockComponent
     @Named("context")

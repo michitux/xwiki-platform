@@ -21,9 +21,11 @@ package org.xwiki.flamingo.test.docker;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
 
+import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -48,6 +50,8 @@ import org.xwiki.test.ui.po.diff.EntityDiff;
 import org.xwiki.test.ui.po.diff.RawChanges;
 import org.xwiki.test.ui.po.diff.RenderedChanges;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.endsWith;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -496,12 +500,16 @@ class AttachmentIT
         assertEquals("inserted", secondChange.getAttribute("data-xwiki-html-diff-block"));
         WebElement deletedImage = firstChange.findElement(By.tagName("img"));
         WebElement insertedImage = secondChange.findElement(By.tagName("img"));
-        assertEquals("image2.gif", deletedImage.getAttribute("alt"));
-        assertEquals("image.png", insertedImage.getAttribute("alt"));
 
-        // Check that both images are base64-encoded.
-        assertTrue(deletedImage.getAttribute("src").startsWith("data:image/gif;base64,"));
-        assertTrue(insertedImage.getAttribute("src").startsWith("data:image/png;base64,"));
+        // Check that the src attribute of the deleted image ends with the image2 (don't check the start as it
+        // depends on the container setup and the nested/non-nested test execution).
+        assertThat(deletedImage.getAttribute("src"), endsWith("/image2.gif?rev=1.1"));
+
+        // Compute the expected base64-encoded content of the inserted image. The HTML diff embeds both images but
+        // replaces the deleted image by the original URL again after the diff computation.
+        String expectedInsertedImageContent = Base64.getEncoder().encodeToString(
+            IOUtils.toByteArray(getClass().getResourceAsStream("/AttachmentIT/SmallSizeAttachment.png")));
+        assertEquals("data:image/png;base64," + expectedInsertedImageContent, insertedImage.getAttribute("src"));
     }
 
     private String getAttachmentsMacroContent(DocumentReference docRef)

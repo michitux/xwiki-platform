@@ -20,11 +20,12 @@
 package org.xwiki.diff.xml.internal;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -37,7 +38,7 @@ import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.xwiki.component.annotation.Component;
 import org.xwiki.diff.DiffException;
-import org.xwiki.diff.xml.XMLDiffConfiguration;
+import org.xwiki.diff.xml.XMLDiffDataURIConverterConfiguration;
 import org.xwiki.model.EntityType;
 import org.xwiki.model.reference.AttachmentReference;
 import org.xwiki.model.reference.DocumentReference;
@@ -46,14 +47,12 @@ import org.xwiki.model.reference.EntityReferenceResolver;
 import org.xwiki.security.authorization.AuthorizationException;
 import org.xwiki.security.authorization.ContextualAuthorizationManager;
 import org.xwiki.security.authorization.Right;
-import org.xwiki.user.CurrentUserReference;
 
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
-import com.xpn.xwiki.doc.DocumentRevisionProvider;
 import com.xpn.xwiki.doc.XWikiAttachment;
 import com.xpn.xwiki.doc.XWikiDocument;
-import com.xpn.xwiki.plugin.XWikiPluginInterface;
+import com.xpn.xwiki.plugin.XWikiPluginManager;
 import com.xpn.xwiki.web.XWikiRequest;
 import com.xpn.xwiki.web.XWikiServletRequestStub;
 
@@ -73,6 +72,10 @@ public class AttachmentDataURIConverter implements DataURIConverter
 
     private static final String QUERY_SEPARATOR = "?";
 
+    private static final String RID = "rid";
+
+    private static final String ID = "id";
+
     @Inject
     private Provider<XWikiContext> xcontextProvider;
 
@@ -84,10 +87,7 @@ public class AttachmentDataURIConverter implements DataURIConverter
     private ContextualAuthorizationManager authorization;
 
     @Inject
-    private DocumentRevisionProvider revisionProvider;
-
-    @Inject
-    private XMLDiffConfiguration xmlDiffConfiguration;
+    private XMLDiffDataURIConverterConfiguration xmlDiffDataURIConverterConfiguration;
 
     @Override
     public String convert(String url) throws DiffException
@@ -97,38 +97,30 @@ public class AttachmentDataURIConverter implements DataURIConverter
             return url;
         }
 
+        XWikiContext context = this.xcontextProvider.get();
+        String absoluteURL = getAbsoluteURL(url, context);
+
         // Get the attachment reference corresponding to the URL.
-        EntityReference entityReference = this.resolver.resolve(url, EntityType.ATTACHMENT);
-        if (!(entityReference instanceof AttachmentReference)) {
-            throw new DiffException("Failed to resolve the URL [" + url + "] to an attachment reference.");
+        EntityReference entityReference = this.resolver.resolve(absoluteURL, EntityType.ATTACHMENT);
+        AttachmentReference attachmentReference;
+        try {
+            attachmentReference = new AttachmentReference(entityReference);
+        } catch (IllegalArgumentException e) {
+            throw new DiffException("Failed to resolve the URL [" + absoluteURL + "] to an attachment reference.");
         }
 
-        AttachmentReference attachmentReference = (AttachmentReference) entityReference;
-
         Map<String, String[]> parameterMap = getParameterMap(url);
-        XWikiContext xcontext = this.xcontextProvider.get();
-
         try {
-            XWikiDocument document = getDocument(attachmentReference.getDocumentReference(), parameterMap, xcontext);
-            if (document == null) {
-                throw new DiffException(String.format("Failed to find the document [%s].",
-                    attachmentReference.getDocumentReference()));
-            }
+            XWikiAttachment attachment = getAttachment(context, attachmentReference, parameterMap);
 
-            XWikiAttachment attachment = document.getAttachment(attachmentReference.getName());
+            attachment = resizeImage(attachment, parameterMap, context);
 
-            if (attachment == null) {
-                throw new DiffException(String.format("Failed to find the attachment [%s].", attachmentReference));
-            }
-
-            attachment = resizeImage(attachment, parameterMap, xcontext);
-
-            long maximumAttachmentSize = this.xmlDiffConfiguration.getMaximumDataURISize();
+            long maximumAttachmentSize = this.xmlDiffDataURIConverterConfiguration.getMaximumDataURISize();
             if (maximumAttachmentSize > 0 && attachment.getLongSize() > maximumAttachmentSize) {
                 throw new DiffException(String.format("The attachment [%s] is too big.", attachmentReference));
             }
 
-            return getDataURI(attachment, xcontext);
+            return getDataURI(attachment, context);
         } catch (XWikiException e) {
             throw new DiffException(
                 String.format("Failed to get the document [%s].", attachmentReference.getDocumentReference()), e);
@@ -142,35 +134,62 @@ public class AttachmentDataURIConverter implements DataURIConverter
         }
     }
 
-    /**
-     * Get the document for the given document reference and parameters, checking view rights for the current user.
-     *
-     * @param documentReference the document reference
-     * @param parameterMap the parameters from which the revision shall be extracted
-     * @param xcontext the XWiki context
-     * @return the document
-     * @throws AuthorizationException if the user doesn't have the right to access the document
-     * @throws XWikiException if an error happens when getting the document
-     */
-    private XWikiDocument getDocument(DocumentReference documentReference, Map<String, String[]> parameterMap,
-        XWikiContext xcontext) throws AuthorizationException, XWikiException
+    private XWikiAttachment getAttachment(XWikiContext context, AttachmentReference attachmentReference,
+        Map<String, String[]> parameterMap) throws AuthorizationException, XWikiException, DiffException
     {
-        XWikiDocument document;
+        DocumentReference documentReference = attachmentReference.getDocumentReference();
 
         // Check if the user has view right on the document.
         this.authorization.checkAccess(Right.VIEW, documentReference);
 
-        // Get the document revision if specified.
-        if (parameterMap.containsKey(REV_PARAMETER)) {
-            String rev = parameterMap.get(REV_PARAMETER)[0];
-            // Check if the user has view right on the document revision.
-            this.revisionProvider.checkAccess(Right.VIEW, CurrentUserReference.INSTANCE, documentReference, rev);
-            document = this.revisionProvider.getRevision(documentReference, rev);
+        XWikiDocument document = context.getWiki().getDocument(documentReference, context);
+
+        XWikiAttachment attachment;
+        String filename = attachmentReference.getName();
+
+        if (parameterMap.containsKey(RID) && context.getWiki().hasAttachmentRecycleBin(context)) {
+            int recycleId = Integer.parseInt(parameterMap.get(RID)[0]);
+            attachment = new XWikiAttachment(document, filename);
+            attachment = context.getWiki().getAttachmentRecycleBinStore()
+                .restoreFromRecycleBin(attachment, recycleId, context, true);
+        } else if (parameterMap.containsKey(ID)) {
+            int id = Integer.parseInt(parameterMap.get(ID)[0]);
+            attachment = document.getAttachmentList().get(id);
         } else {
-            document = xcontext.getWiki().getDocument(documentReference, xcontext);
+            attachment = document.getAttachment(filename);
         }
 
-        return document;
+        if (attachment == null) {
+            throw new DiffException(String.format("Failed to find the attachment [%s].", attachmentReference));
+        }
+
+        if (parameterMap.containsKey(REV_PARAMETER)) {
+            synchronized (attachment) {
+                XWikiAttachment oldAttachment = attachment.getAttachmentRevision(parameterMap.get(REV_PARAMETER)[0],
+                    context);
+                if (oldAttachment != null) {
+                    attachment = oldAttachment;
+                }
+            }
+        }
+
+        return attachment;
+    }
+
+    private String getAbsoluteURL(String url, XWikiContext xcontext) throws DiffException
+    {
+        String absoluteURL;
+        try {
+            if (xcontext.getRequest() != null && xcontext.getRequest().getHttpServletRequest() != null) {
+                URL requestURL = new URL(xcontext.getRequest().getHttpServletRequest().getRequestURL().toString());
+                absoluteURL = new URL(requestURL, url).toString();
+            } else {
+                absoluteURL = new URL(url).toString();
+            }
+        } catch (MalformedURLException e) {
+            throw new DiffException(String.format("Failed to resolve [%s] to an absolute URL.", url), e);
+        }
+        return absoluteURL;
     }
 
     /**
@@ -184,30 +203,22 @@ public class AttachmentDataURIConverter implements DataURIConverter
     private XWikiAttachment resizeImage(XWikiAttachment attachment, Map<String, String[]> parameterMap,
         XWikiContext xcontext)
     {
-        XWikiAttachment result;
+        // Backup the request to be able to restore it later.
+        XWikiRequest backupRequest = xcontext.getRequest();
 
-        if (Stream.of("width", "height", "quality").anyMatch(parameterMap::containsKey)) {
+        try {
+            // The image plugin reads the request parameters to get the image size, so fake a request with the
+            // parameters.
+            XWikiRequest stubRequest =
+                new XWikiServletRequestStub.Builder().setRequestParameters(parameterMap).build();
+            xcontext.setRequest(stubRequest);
 
-            // Backup the request to be able to restore it later.
-            XWikiRequest backupRequest = xcontext.getRequest();
-
-            try {
-                // The image plugin reads the request parameters to get the image size, so fake a request with the
-                // parameters.
-                XWikiRequest stubRequest =
-                    new XWikiServletRequestStub.Builder().setRequestParameters(parameterMap).build();
-                xcontext.setRequest(stubRequest);
-
-                XWikiPluginInterface imagePlugin = xcontext.getWiki().getPluginManager().getPlugin("image");
-                result = imagePlugin.downloadAttachment(attachment, xcontext);
-            } finally {
-                // Restore the original request.
-                xcontext.setRequest(backupRequest);
-            }
-        } else {
-            result = attachment;
+            XWikiPluginManager plugins = xcontext.getWiki().getPluginManager();
+            return plugins.downloadAttachment(attachment, xcontext);
+        } finally {
+            // Restore the original request.
+            xcontext.setRequest(backupRequest);
         }
-        return result;
     }
 
     private String getDataURI(XWikiAttachment attachment, XWikiContext xcontext) throws IOException, XWikiException

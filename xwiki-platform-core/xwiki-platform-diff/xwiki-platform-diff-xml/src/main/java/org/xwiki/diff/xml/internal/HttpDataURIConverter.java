@@ -26,6 +26,7 @@ import java.net.URL;
 import java.util.Base64;
 
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.inject.Provider;
 import javax.inject.Singleton;
 
@@ -52,6 +53,7 @@ import com.xpn.xwiki.XWikiContext;
  */
 @Component
 @Singleton
+@Named("http")
 public class HttpDataURIConverter implements DataURIConverter, Initializable, Disposable
 {
     @Inject

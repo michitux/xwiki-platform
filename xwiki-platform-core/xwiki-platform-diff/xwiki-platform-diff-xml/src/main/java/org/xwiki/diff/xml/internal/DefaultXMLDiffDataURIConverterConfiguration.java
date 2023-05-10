@@ -25,7 +25,7 @@ import javax.inject.Singleton;
 
 import org.xwiki.component.annotation.Component;
 import org.xwiki.configuration.ConfigurationSource;
-import org.xwiki.diff.xml.XMLDiffConfiguration;
+import org.xwiki.diff.xml.XMLDiffDataURIConverterConfiguration;
 
 /**
  * Configuration for the XML diff.
@@ -34,7 +34,7 @@ import org.xwiki.diff.xml.XMLDiffConfiguration;
  */
 @Component
 @Singleton
-public class DefaultXMLDiffConfiguration implements XMLDiffConfiguration
+public class DefaultXMLDiffDataURIConverterConfiguration implements XMLDiffDataURIConverterConfiguration
 {
     private static final String PREFIX = "diff.xml";
 

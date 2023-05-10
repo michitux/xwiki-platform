@@ -21,39 +21,43 @@ package org.xwiki.diff.xml.internal;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 
 import javax.inject.Named;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mock;
 import org.xwiki.diff.DiffException;
-import org.xwiki.diff.xml.XMLDiffConfiguration;
+import org.xwiki.diff.xml.XMLDiffDataURIConverterConfiguration;
 import org.xwiki.model.EntityType;
 import org.xwiki.model.reference.AttachmentReference;
 import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.model.reference.EntityReferenceResolver;
 import org.xwiki.security.authorization.AccessDeniedException;
-import org.xwiki.security.authorization.AuthorizationException;
 import org.xwiki.security.authorization.Right;
 import org.xwiki.test.junit5.mockito.InjectMockComponents;
 import org.xwiki.test.junit5.mockito.MockComponent;
-import org.xwiki.user.CurrentUserReference;
 
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.DocumentRevisionProvider;
 import com.xpn.xwiki.doc.XWikiAttachment;
 import com.xpn.xwiki.doc.XWikiDocument;
-import com.xpn.xwiki.plugin.XWikiPluginInterface;
 import com.xpn.xwiki.plugin.XWikiPluginManager;
 import com.xpn.xwiki.test.MockitoOldcore;
 import com.xpn.xwiki.test.junit5.mockito.InjectMockitoOldcore;
 import com.xpn.xwiki.test.junit5.mockito.OldcoreTest;
+import com.xpn.xwiki.web.XWikiServletRequestStub;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -77,6 +81,10 @@ class AttachmentDataURIConverterTest
 
     private static final String ATTACHMENT_URL = "/xwiki/bin/download/Space/Page/attachment.png";
 
+    private static final String BASE_URL = "https://example.com";
+
+    private static final String REQUEST_URL = BASE_URL + "/xwiki/bin/view/Space/Page";
+
     @MockComponent
     @Named("resource/standardURL")
     private EntityReferenceResolver<String> resolver;
@@ -85,13 +93,34 @@ class AttachmentDataURIConverterTest
     private DocumentRevisionProvider documentRevisionProvider;
 
     @MockComponent
-    private XMLDiffConfiguration configuration;
+    private XMLDiffDataURIConverterConfiguration configuration;
 
     @InjectMockComponents
     private AttachmentDataURIConverter converter;
 
     @InjectMockitoOldcore
     private MockitoOldcore mockitoOldcore;
+
+    @Mock
+    private XWikiPluginManager mockPluginManager;
+
+    @BeforeEach
+    void configureBaseURL() throws MalformedURLException
+    {
+        XWikiContext context = this.mockitoOldcore.getXWikiContext();
+        XWikiServletRequestStub request =
+            new XWikiServletRequestStub.Builder().setRequestURL(new URL(REQUEST_URL)).build();
+        context.setRequest(request);
+    }
+
+    @BeforeEach
+    void mockPluginManager()
+    {
+        when(this.mockPluginManager.downloadAttachment(any(XWikiAttachment.class), any()))
+            .then(invocation -> invocation.getArgument(0));
+        when(this.mockitoOldcore.getSpyXWiki().getPluginManager()).thenReturn(this.mockPluginManager);
+
+    }
 
     @Test
     void dataURI() throws DiffException
@@ -112,20 +141,32 @@ class AttachmentDataURIConverterTest
     }
 
     @Test
-    void conversionWithRevision() throws DiffException, IOException, XWikiException, AuthorizationException
+    void conversionWithRevision() throws DiffException, IOException, XWikiException
     {
-        String url = ATTACHMENT_URL + "?rev=1.1";
-
-        XWikiDocument document = setUpDocument(url);
-
         String revision = "1.1";
-        when(this.documentRevisionProvider.getRevision(DOCUMENT_REFERENCE, revision))
-            .thenReturn(document);
+        String url = ATTACHMENT_URL + "?rev=" + revision;
+
+        // Work with a mock attachment as the real attachment doesn't seem to support versioning in MockitoOldcore.
+        XWikiDocument document = setUpDocument(url);
+        XWikiAttachment mockAttachment = mock();
+        when(mockAttachment.getContentInputStream(any()))
+            .thenReturn(new ByteArrayInputStream("currentContent".getBytes()));
+        when(mockAttachment.getFilename()).thenReturn(ATTACHMENT_NAME);
+        when(mockAttachment.getMimeType(any())).thenReturn("image/png");
+
+        XWikiAttachment mockOldAttachment = mock();
+        when(mockOldAttachment.getContentInputStream(any()))
+            .thenReturn(new ByteArrayInputStream("attachmentContent".getBytes()));
+        when(mockOldAttachment.getFilename()).thenReturn(ATTACHMENT_NAME);
+        when(mockOldAttachment.getMimeType(any())).thenReturn("image/png");
+        when(mockAttachment.getAttachmentRevision(eq(revision), any())).thenReturn(mockOldAttachment);
+
+        document.setAttachment(mockAttachment);
+        // Mock the call to get the document as we cannot save the document with the mock attachment as cloning the
+        // mock attachment fails.
+        doReturn(document).when(this.mockitoOldcore.getSpyXWiki()).getDocument(eq(DOCUMENT_REFERENCE), any());
 
         assertEquals(DATA_URI, this.converter.convert(url));
-        verify(this.documentRevisionProvider).getRevision(DOCUMENT_REFERENCE, revision);
-        verify(this.documentRevisionProvider).checkAccess(Right.VIEW, CurrentUserReference.INSTANCE, DOCUMENT_REFERENCE,
-            revision);
     }
 
     @Test
@@ -135,23 +176,17 @@ class AttachmentDataURIConverterTest
 
         setUpDocument(url);
 
-        // Mock the image plugin
-        XWikiPluginInterface imagePlugin = mock();
-        String pluginName = "image";
-        when(imagePlugin.getName()).thenReturn(pluginName);
-        XWikiPluginManager mockPluginManager = mock();
-        when(mockPluginManager.getPlugin(pluginName)).thenReturn(imagePlugin);
-        when(this.mockitoOldcore.getSpyXWiki().getPluginManager()).thenReturn(mockPluginManager);
-
         XWikiAttachment resizedImage = mock();
         when(resizedImage.getMimeType(any())).thenReturn("image/png");
         when(resizedImage.getContentInputStream(any()))
             .thenReturn(new ByteArrayInputStream("resizedContent".getBytes()));
 
-        when(imagePlugin.downloadAttachment(any(XWikiAttachment.class), any())).then(invocation -> {
+        when(this.mockPluginManager.downloadAttachment(any(XWikiAttachment.class), any())).then(invocation -> {
             XWikiAttachment attachment = invocation.getArgument(0);
             XWikiContext context = invocation.getArgument(1);
 
+            // Verify that the context has the correct parameters. This cannot be done with an argument captor
+            // because the context is reset after the invocation.
             assertEquals("200", context.getRequest().getParameter("width"));
             assertEquals("100", context.getRequest().getParameter("height"));
 
@@ -179,7 +214,7 @@ class AttachmentDataURIConverterTest
 
     private XWikiDocument setUpDocument(String url) throws IOException, XWikiException
     {
-        when(this.resolver.resolve(url, EntityType.ATTACHMENT)).thenReturn(ATTACHMENT_REFERENCE);
+        when(this.resolver.resolve(BASE_URL + url, EntityType.ATTACHMENT)).thenReturn(ATTACHMENT_REFERENCE);
 
         XWikiDocument document = new XWikiDocument(DOCUMENT_REFERENCE);
         document.setAttachment(ATTACHMENT_NAME, new ByteArrayInputStream("attachmentContent".getBytes()),
