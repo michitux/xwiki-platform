@@ -27,7 +27,7 @@ import org.xwiki.component.annotation.Component;
 /**
  * Simple factory for HttpClientBuilder to help testing.
  *
- * @since 14.10.10
+ * @since 14.10.11
  * @since 15.4RC1
  * @version $Id$
  */

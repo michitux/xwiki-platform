@@ -26,7 +26,7 @@ import org.xwiki.stability.Unstable;
 /**
  * Configuration for the XML diff module.
  *
- * @since 14.10.10
+ * @since 14.10.11
  * @since 15.4RC1
  * @version $Id$
  */

@@ -47,8 +47,10 @@ import org.xwiki.user.UserReferenceSerializer;
 import com.xpn.xwiki.XWikiContext;
 
 /**
- * Default implementation of {@link DataURIConverter}.
- * 
+ * Implementation of {@link DataURIConverter} that uses an HTTP client to embed images.
+ *
+ * @since 14.10.11
+ * @since 15.4RC1
  * @version $Id$
  */
 @Component
