@@ -26,25 +26,27 @@ import java.net.URI;
 import java.util.List;
 
 import javax.inject.Provider;
-import javax.servlet.http.Cookie;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpStatus;
 import org.apache.http.ProtocolVersion;
 import org.apache.http.StatusLine;
-import org.apache.http.client.CookieStore;
 import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.message.BasicStatusLine;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.xwiki.diff.xml.XMLDiffDataURIConverterConfiguration;
+import org.xwiki.security.authentication.AuthenticationConfiguration;
 import org.xwiki.test.junit5.mockito.ComponentTest;
 import org.xwiki.test.junit5.mockito.InjectMockComponents;
 import org.xwiki.test.junit5.mockito.MockComponent;
@@ -70,7 +72,7 @@ class ImageDownloaderTest
 {
     private static final ProtocolVersion HTTP_VERSION = new ProtocolVersion("HTTP", 1, 1);
 
-    private static final URI IMAGE_URI = URI.create("https://example.com/image.png");
+    private static final URI IMAGE_URI = URI.create("https://www.example.com/image.png");
 
     private static final String IMAGE_CONTENT_TYPE = "image/png";
 
@@ -82,6 +84,9 @@ class ImageDownloaderTest
 
     @MockComponent
     private XMLDiffDataURIConverterConfiguration configuration;
+
+    @MockComponent
+    private AuthenticationConfiguration authenticationConfiguration;
 
     @InjectMockComponents
     private ImageDownloader imageDownloader;
@@ -190,34 +195,43 @@ class ImageDownloaderTest
         assertEquals(IMAGE_CONTENT_TYPE, result.getMimeType());
     }
 
-    @Test
-    void passesCookiesFromRequest() throws IOException
+    @ParameterizedTest
+    @CsvSource({
+        "www.example.com, true, ",
+        "www.xwiki.org, false, ",
+        "test.example.com, false, ",
+        "matches.example.com, true, .example.com"
+    })
+    void passesCookiesFromRequest(String requestDomain, boolean shouldSendCookie, String cookieDomain)
+        throws IOException
     {
         // Set a mock request in the context.
         XWikiRequest request = mock();
+        when(request.getServerName()).thenReturn(requestDomain);
+        String cookieHeader = "cookie1=value1; cookie2=value2";
+        when(request.getHeader("Cookie")).thenReturn(cookieHeader);
         when(this.xwikiContext.getRequest()).thenReturn(request);
-        // Set some cookies on the mock request.
-        Cookie[] cookies = new Cookie[] { new Cookie("name1", "value1"), new Cookie("name2", "value2") };
-        when(request.getCookies()).thenReturn(cookies);
-        cookies[0].setDomain("example.com");
-        cookies[0].setPath("/path1");
-        cookies[1].setDomain("xwiki.org");
+
+        if (StringUtils.isNotBlank(cookieDomain)) {
+            when(this.authenticationConfiguration.getCookieDomains()).thenReturn(List.of(cookieDomain));
+        }
 
         // Trigger the download.
         byte[] content = new byte[] { 1, 2, 3 };
         when(this.httpEntity.getContent()).thenReturn(new ByteArrayInputStream(content));
         this.imageDownloader.download(IMAGE_URI);
 
-        // Verify that the cookies are passed to the HTTP client.
-        ArgumentCaptor<CookieStore> cookieStoreCaptor = ArgumentCaptor.forClass(CookieStore.class);
-        verify(this.httpClientBuilder).setDefaultCookieStore(cookieStoreCaptor.capture());
-        List<org.apache.http.cookie.Cookie> clientCookies = cookieStoreCaptor.getValue().getCookies();
-        assertEquals(2, clientCookies.size());
-        for (int i = 0; i < 2; ++i) {
-            assertEquals(cookies[i].getName(), clientCookies.get(i).getName());
-            assertEquals(cookies[i].getValue(), clientCookies.get(i).getValue());
-            assertEquals(cookies[i].getDomain(), clientCookies.get(i).getDomain());
-            assertEquals(cookies[i].getPath(), clientCookies.get(i).getPath());
+        ArgumentCaptor<HttpUriRequest> requestCaptor = ArgumentCaptor.forClass(HttpUriRequest.class);
+        verify(this.httpClient).execute(requestCaptor.capture());
+
+        // Verify that the cookies are passed to the HTTP client if it should do so.
+        HttpUriRequest httpRequest = requestCaptor.getValue();
+        Header[] headers = httpRequest.getHeaders("Cookie");
+        if (shouldSendCookie) {
+            assertEquals(1, headers.length);
+            assertEquals(cookieHeader, headers[0].getValue());
+        } else {
+            assertEquals(0, headers.length);
         }
     }
 }

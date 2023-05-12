@@ -21,12 +21,12 @@ package org.xwiki.diff.xml.internal;
 
 import java.io.IOException;
 import java.net.URI;
-import java.util.Date;
+import java.util.Optional;
 
 import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Singleton;
-import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.BoundedInputStream;
@@ -37,12 +37,11 @@ import org.apache.http.StatusLine;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.BasicCookieStore;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.impl.cookie.BasicClientCookie;
 import org.xwiki.component.annotation.Component;
 import org.xwiki.diff.xml.XMLDiffDataURIConverterConfiguration;
+import org.xwiki.security.authentication.AuthenticationConfiguration;
 
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.web.XWikiRequest;
@@ -58,6 +57,10 @@ import com.xpn.xwiki.web.XWikiRequest;
 @Singleton
 public class ImageDownloader
 {
+    private static final String COOKIE_DOMAIN_PREFIX = ".";
+
+    private static final String HEADER_COOKIE = "Cookie";
+
     @Inject
     private HttpClientBuilderFactory httpClientBuilderFactory;
 
@@ -66,6 +69,9 @@ public class ImageDownloader
 
     @Inject
     private XMLDiffDataURIConverterConfiguration configuration;
+
+    @Inject
+    private AuthenticationConfiguration authenticationConfiguration;
 
     /**
      * The result of a download request.
@@ -167,6 +173,12 @@ public class ImageDownloader
             .setConnectionRequestTimeout(timeoutMilliseconds)
             .build();
         getMethod.setConfig(requestConfig);
+        XWikiRequest request = this.xcontextProvider.get().getRequest();
+        if (request != null && matchesCookieDomain(uri.getHost(), request)) {
+            // Copy the cookie header from the current request.
+            getMethod.setHeader(HEADER_COOKIE, request.getHeader(HEADER_COOKIE));
+        }
+
         return getMethod;
     }
 
@@ -175,35 +187,30 @@ public class ImageDownloader
         HttpClientBuilder httpClientBuilder = this.httpClientBuilderFactory.create();
         httpClientBuilder.useSystemProperties();
         httpClientBuilder.setUserAgent("XWikiHTMLDiff");
-        XWikiRequest request = this.xcontextProvider.get().getRequest();
-        if (request != null) {
-            // Copy the cookies from the current request. Let the HTTP client take care of matching cookies against
-            // the request URI.
-            BasicCookieStore cookieStore = new BasicCookieStore();
-            for (Cookie cookie : request.getCookies()) {
-                cookieStore.addCookie(convertCookie(cookie));
-            }
-
-            httpClientBuilder.setDefaultCookieStore(cookieStore);
-        }
         return httpClientBuilder;
     }
 
-    private static BasicClientCookie convertCookie(Cookie cookie)
+    /**
+     * @return if the host matches the cookie domain of the current request
+     */
+    private boolean matchesCookieDomain(String host, HttpServletRequest request)
     {
-        BasicClientCookie result = new BasicClientCookie(cookie.getName(), cookie.getValue());
-        if (cookie.getMaxAge() > -1) {
-            Date expires = new Date(System.currentTimeMillis() + cookie.getMaxAge() * 1000L);
-            result.setExpiryDate(expires);
-        }
-        result.setDomain(cookie.getDomain());
-        result.setPath(cookie.getPath());
-        result.setSecure(cookie.getSecure());
-        if (cookie.isHttpOnly()) {
-            result.setAttribute("httponly", "true");
-        }
-        result.setComment(cookie.getComment());
+        String serverName = request.getServerName();
+        // Add a leading dot to avoid matching domains that are longer versions of the cookie domain and to ensure
+        // that the cookie domain itself is matched as the cookie domain also contains the leading dot. Always add
+        // the dot as two dots will still match.
+        String prefixedServerName = COOKIE_DOMAIN_PREFIX + serverName;
 
-        return result;
+        Optional<String> cookieDomain =
+            this.authenticationConfiguration.getCookieDomains().stream()
+                .filter(prefixedServerName::endsWith)
+                .findFirst();
+
+        // If there is a cookie domain, check if the host also matches it.
+        return cookieDomain.map((COOKIE_DOMAIN_PREFIX + host)::endsWith)
+            // If no cookie domain is configured, check for an exact match with the server name as no domain is sent in
+            // this case and thus the cookie isn't valid for subdomains.
+            .orElseGet(() -> host.equals(serverName));
     }
+
 }
