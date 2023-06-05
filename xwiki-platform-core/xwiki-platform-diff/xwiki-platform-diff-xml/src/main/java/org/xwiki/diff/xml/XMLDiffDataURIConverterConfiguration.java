@@ -37,7 +37,7 @@ public interface XMLDiffDataURIConverterConfiguration
     /**
      * @return the timeout to use when fetching data from the web to embed as data URI
      */
-    int getHttpTimeout();
+    int getHTTPTimeout();
 
     /**
      * @return the maximum size of the data to embed as data URI

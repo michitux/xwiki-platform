@@ -166,7 +166,7 @@ public class ImageDownloader
     private HttpGet initializeGetMethod(URI uri)
     {
         HttpGet getMethod = new HttpGet(uri);
-        int timeoutMilliseconds = this.configuration.getHttpTimeout() * 1000;
+        int timeoutMilliseconds = this.configuration.getHTTPTimeout() * 1000;
         RequestConfig requestConfig = RequestConfig.custom()
             .setConnectTimeout(timeoutMilliseconds)
             .setSocketTimeout(timeoutMilliseconds)

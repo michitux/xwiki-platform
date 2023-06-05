@@ -43,7 +43,7 @@ public class DefaultXMLDiffDataURIConverterConfiguration implements XMLDiffDataU
     private ConfigurationSource configurationSource;
 
     @Override
-    public int getHttpTimeout()
+    public int getHTTPTimeout()
     {
         return this.configurationSource.getProperty(getFullKeyName("httpTimeout"), Integer.class, 10);
     }
