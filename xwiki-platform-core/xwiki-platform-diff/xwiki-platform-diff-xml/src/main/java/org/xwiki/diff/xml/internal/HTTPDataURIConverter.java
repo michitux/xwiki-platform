@@ -20,10 +20,8 @@
 package org.xwiki.diff.xml.internal;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.Base64;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -56,7 +54,7 @@ import com.xpn.xwiki.XWikiContext;
 @Component
 @Singleton
 @Named("http")
-public class HttpDataURIConverter implements DataURIConverter, Initializable, Disposable
+public class HTTPDataURIConverter extends AbstractDataURIConverter implements Initializable, Disposable
 {
     @Inject
     private Provider<XWikiContext> xcontextProvider;
@@ -87,7 +85,7 @@ public class HttpDataURIConverter implements DataURIConverter, Initializable, Di
         cacheConfig.put(EntryEvictionConfiguration.CONFIGURATIONID, lru);
 
         CacheConfiguration failureCacheConfiguration = new CacheConfiguration();
-        failureCacheConfiguration.setConfigurationId("diff.html.failureCache");
+        failureCacheConfiguration.setConfigurationId("diff.html.dataURIFailureCache");
         LRUEvictionConfiguration failureLRU = new LRUEvictionConfiguration();
         failureLRU.setMaxEntries(1000);
         // Cache failures for an hour. This is to avoid hammering the server with requests for images that don't
@@ -137,12 +135,7 @@ public class HttpDataURIConverter implements DataURIConverter, Initializable, Di
 
         // Convert URL to absolute URL to avoid issues with relative URLs that might reference different images
         // in different subwikis.
-        URL absoluteURL;
-        try {
-            absoluteURL = getAbsoluteURL(url);
-        } catch (MalformedURLException e) {
-            throw new DiffException("Failed to convert malformed url [" + url + "] to absolute URL.", e);
-        }
+        URL absoluteURL = getAbsoluteURL(url, this.xcontextProvider.get());
 
         String cacheKey = getCacheKey(absoluteURL);
 
@@ -168,13 +161,6 @@ public class HttpDataURIConverter implements DataURIConverter, Initializable, Di
         }
     }
 
-    private URL getAbsoluteURL(String relativeURL) throws MalformedURLException
-    {
-        XWikiContext xcontext = this.xcontextProvider.get();
-        URL baseURL = xcontext.getURLFactory().getServerURL(xcontext);
-        return new URL(baseURL, relativeURL);
-    }
-
     private String convert(URL url) throws IOException, URISyntaxException
     {
         if (!this.urlSecurityManager.isDomainTrusted(url)) {
@@ -183,7 +169,6 @@ public class HttpDataURIConverter implements DataURIConverter, Initializable, Di
 
         ImageDownloader.DownloadResult downloadResult = this.imageDownloader.download(url.toURI());
 
-        return String.format("data:%s;base64,%s", downloadResult.getMimeType(),
-            Base64.getEncoder().encodeToString(downloadResult.getData()));
+        return getDataURI(downloadResult.getContentType(), downloadResult.getData());
     }
 }

@@ -31,15 +31,18 @@ import org.xwiki.component.annotation.Component;
  * @since 15.4RC1
  * @version $Id$
  */
-@Component(roles = HttpClientBuilderFactory.class)
+@Component(roles = HTTPClientBuilderFactory.class)
 @Singleton
-public class HttpClientBuilderFactory
+public class HTTPClientBuilderFactory
 {
     /**
      * @return a new HTTPClientBuilder
      */
     public HttpClientBuilder create()
     {
-        return HttpClientBuilder.create();
+        HttpClientBuilder result = HttpClientBuilder.create();
+        result.useSystemProperties();
+        result.setUserAgent("XWikiHTMLDiff");
+        return result;
     }
 }

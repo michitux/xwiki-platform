@@ -43,7 +43,7 @@ import org.xwiki.user.CurrentUserReference;
 import org.xwiki.user.UserReferenceSerializer;
 
 import com.xpn.xwiki.XWikiContext;
-import com.xpn.xwiki.web.XWikiURLFactory;
+import com.xpn.xwiki.web.XWikiServletRequestStub;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -54,26 +54,18 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit tests for {@link HttpDataURIConverter}.
+ * Unit tests for {@link HTTPDataURIConverter}.
  *
  * @version $Id$
  */
 @ComponentTest
-class HttpDataURIConverterTest
+class HTTPDataURIConverterTest
 {
     private static final String CURRENT_USER = "XWiki.CurrentUser";
 
     private static final String CACHE_PREFIX = CURRENT_USER.length() + ":" + CURRENT_USER + ":";
 
-    private static final URL BASE_URL;
-
-    static {
-        try {
-            BASE_URL = new URL("http", "localhost", 8080, "/xwiki");
-        } catch (MalformedURLException e) {
-            throw new RuntimeException(e);
-        }
-    }
+    private static final String REQUEST_URL = "http://localhost:8080/xwiki";
 
     private static final String URL_PREFIX = "http://localhost:8080";
 
@@ -97,7 +89,7 @@ class HttpDataURIConverterTest
     private UserReferenceSerializer<String> userReferenceSerializer;
 
     @InjectMockComponents
-    private HttpDataURIConverter converter;
+    private HTTPDataURIConverter converter;
 
     @BeforeComponent
     public void configureCacheManager() throws CacheException
@@ -109,7 +101,7 @@ class HttpDataURIConverterTest
             CacheConfiguration configuration = invocationOnMock.getArgument(0);
             if ("diff.html.dataURI".equals(configuration.getConfigurationId())) {
                 return this.cache;
-            } else if ("diff.html.failureCache".equals(configuration.getConfigurationId())) {
+            } else if ("diff.html.dataURIFailureCache".equals(configuration.getConfigurationId())) {
                 return this.failureCache;
             }
 
@@ -124,9 +116,9 @@ class HttpDataURIConverterTest
 
         XWikiContext xwikiContext = mock();
         when(this.xwikiContextProvider.get()).thenReturn(xwikiContext);
-        XWikiURLFactory urlFactory = mock();
-        when(xwikiContext.getURLFactory()).thenReturn(urlFactory);
-        when(urlFactory.getServerURL(any())).thenReturn(BASE_URL);
+        XWikiServletRequestStub request = new XWikiServletRequestStub();
+        request.setrequestURL(new StringBuffer(REQUEST_URL));
+        when(xwikiContext.getRequest()).thenReturn(request);
     }
 
     @Test

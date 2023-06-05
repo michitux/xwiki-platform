@@ -62,7 +62,7 @@ public class ImageDownloader
     private static final String HEADER_COOKIE = "Cookie";
 
     @Inject
-    private HttpClientBuilderFactory httpClientBuilderFactory;
+    private HTTPClientBuilderFactory httpClientBuilderFactory;
 
     @Inject
     private Provider<XWikiContext> xcontextProvider;
@@ -80,16 +80,16 @@ public class ImageDownloader
     {
         private final byte[] data;
 
-        private final String mimeType;
+        private final String contentType;
 
         /**
          * @param data the downloaded data
-         * @param mimeType the MIME type of the downloaded data
+         * @param contentType the MIME type of the downloaded data
          */
-        public DownloadResult(byte[] data, String mimeType)
+        public DownloadResult(byte[] data, String contentType)
         {
             this.data = data;
-            this.mimeType = mimeType;
+            this.contentType = contentType;
         }
 
         /**
@@ -103,9 +103,9 @@ public class ImageDownloader
         /**
          * @return the MIME type of the downloaded data
          */
-        public String getMimeType()
+        public String getContentType()
         {
-            return this.mimeType;
+            return this.contentType;
         }
     }
 
@@ -118,7 +118,7 @@ public class ImageDownloader
      */
     public DownloadResult download(URI uri) throws IOException
     {
-        HttpClientBuilder httpClientBuilder = configureHttpClientBuilder();
+        HttpClientBuilder httpClientBuilder = this.httpClientBuilderFactory.create();
 
         HttpGet getMethod = initializeGetMethod(uri);
 
@@ -143,6 +143,8 @@ public class ImageDownloader
 
                 byte[] content;
                 if (maximumSize > 0) {
+                    // The content length is not always available (then it is negative), so we need to use a bounded
+                    // input stream to make sure we don't read more than the maximum size.
                     try (BoundedInputStream boundedInputStream = new BoundedInputStream(entity.getContent(),
                         maximumSize))
                     {
@@ -180,14 +182,6 @@ public class ImageDownloader
         }
 
         return getMethod;
-    }
-
-    private HttpClientBuilder configureHttpClientBuilder()
-    {
-        HttpClientBuilder httpClientBuilder = this.httpClientBuilderFactory.create();
-        httpClientBuilder.useSystemProperties();
-        httpClientBuilder.setUserAgent("XWikiHTMLDiff");
-        return httpClientBuilder;
     }
 
     /**

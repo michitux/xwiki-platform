@@ -20,10 +20,7 @@
 package org.xwiki.diff.xml.internal;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -66,13 +63,13 @@ import com.xpn.xwiki.web.XWikiServletRequestStub;
 @Component
 @Singleton
 @Named("attachment")
-public class AttachmentDataURIConverter implements DataURIConverter
+public class AttachmentDataURIConverter extends AbstractDataURIConverter
 {
     private static final String REV_PARAMETER = "rev";
 
     private static final String QUERY_SEPARATOR = "?";
 
-    private static final String RID = "rid";
+    private static final String RECYCLE_BIN_ID_PARAMETER = "rid";
 
     private static final String ID = "id";
 
@@ -98,7 +95,7 @@ public class AttachmentDataURIConverter implements DataURIConverter
         }
 
         XWikiContext context = this.xcontextProvider.get();
-        String absoluteURL = getAbsoluteURL(url, context);
+        String absoluteURL = getAbsoluteURL(url, context).toString();
 
         // Get the attachment reference corresponding to the URL.
         EntityReference entityReference = this.resolver.resolve(absoluteURL, EntityType.ATTACHMENT);
@@ -147,12 +144,16 @@ public class AttachmentDataURIConverter implements DataURIConverter
         XWikiAttachment attachment;
         String filename = attachmentReference.getName();
 
-        if (parameterMap.containsKey(RID) && context.getWiki().hasAttachmentRecycleBin(context)) {
-            int recycleId = Integer.parseInt(parameterMap.get(RID)[0]);
+        // The following code closely follows the code of DownloadRevAction.
+        if (parameterMap.containsKey(RECYCLE_BIN_ID_PARAMETER) && context.getWiki().hasAttachmentRecycleBin(context)) {
+            // Retrieve the attachment from the recycle bin.
+            int recycleId = Integer.parseInt(parameterMap.get(RECYCLE_BIN_ID_PARAMETER)[0]);
             attachment = new XWikiAttachment(document, filename);
             attachment = context.getWiki().getAttachmentRecycleBinStore()
                 .restoreFromRecycleBin(attachment, recycleId, context, true);
         } else if (parameterMap.containsKey(ID)) {
+            // Retrieve the attachment from the list of attachments by position as this is also supported by
+            // DownloadRevAction.
             int id = Integer.parseInt(parameterMap.get(ID)[0]);
             attachment = document.getAttachmentList().get(id);
         } else {
@@ -174,22 +175,6 @@ public class AttachmentDataURIConverter implements DataURIConverter
         }
 
         return attachment;
-    }
-
-    private String getAbsoluteURL(String url, XWikiContext xcontext) throws DiffException
-    {
-        String absoluteURL;
-        try {
-            if (xcontext.getRequest() != null && xcontext.getRequest().getHttpServletRequest() != null) {
-                URL requestURL = new URL(xcontext.getRequest().getHttpServletRequest().getRequestURL().toString());
-                absoluteURL = new URL(requestURL, url).toString();
-            } else {
-                absoluteURL = new URL(url).toString();
-            }
-        } catch (MalformedURLException e) {
-            throw new DiffException(String.format("Failed to resolve [%s] to an absolute URL.", url), e);
-        }
-        return absoluteURL;
     }
 
     /**
@@ -225,7 +210,7 @@ public class AttachmentDataURIConverter implements DataURIConverter
     {
         String contentType = attachment.getMimeType(xcontext);
         byte[] content = IOUtils.toByteArray(attachment.getContentInputStream(xcontext));
-        return String.format("data:%s;base64,%s", contentType, Base64.getEncoder().encodeToString(content));
+        return getDataURI(contentType, content);
     }
 
     private Map<String, String[]> getParameterMap(String url)
@@ -233,8 +218,11 @@ public class AttachmentDataURIConverter implements DataURIConverter
         Map<String, String[]> parameterMap;
         if (url.contains(QUERY_SEPARATOR)) {
             String query = StringUtils.substringAfter(url, QUERY_SEPARATOR);
+            // Group the parameters by name and create an array for each key.
             parameterMap = URLEncodedUtils.parse(query, StandardCharsets.UTF_8).stream()
-                .collect(Collectors.toMap(NameValuePair::getName, pair -> new String[] { pair.getValue() }));
+                .filter(pair -> StringUtils.isNotBlank(pair.getName()))
+                .collect(Collectors.groupingBy(NameValuePair::getName, Collectors.mapping(NameValuePair::getValue,
+                    Collectors.collectingAndThen(Collectors.toList(), list -> list.toArray(new String[0])))));
         } else {
             parameterMap = Map.of();
         }

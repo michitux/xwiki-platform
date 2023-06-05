@@ -77,7 +77,7 @@ class ImageDownloaderTest
     private static final String IMAGE_CONTENT_TYPE = "image/png";
 
     @MockComponent
-    private HttpClientBuilderFactory httpClientBuilderFactory;
+    private HTTPClientBuilderFactory httpClientBuilderFactory;
 
     @MockComponent
     private Provider<XWikiContext> xwikiContextProvider;
@@ -192,7 +192,7 @@ class ImageDownloaderTest
         when(this.httpEntity.getContent()).thenReturn(new ByteArrayInputStream(content));
         ImageDownloader.DownloadResult result = this.imageDownloader.download(IMAGE_URI);
         assertArrayEquals(content, result.getData());
-        assertEquals(IMAGE_CONTENT_TYPE, result.getMimeType());
+        assertEquals(IMAGE_CONTENT_TYPE, result.getContentType());
     }
 
     @ParameterizedTest
