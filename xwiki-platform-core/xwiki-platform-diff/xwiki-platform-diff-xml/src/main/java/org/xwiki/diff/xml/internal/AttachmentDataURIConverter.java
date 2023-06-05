@@ -115,7 +115,7 @@ public class AttachmentDataURIConverter implements DataURIConverter
 
             attachment = resizeImage(attachment, parameterMap, context);
 
-            long maximumAttachmentSize = this.xmlDiffDataURIConverterConfiguration.getMaximumDataURISize();
+            long maximumAttachmentSize = this.xmlDiffDataURIConverterConfiguration.getMaximumContentSize();
             if (maximumAttachmentSize > 0 && attachment.getLongSize() > maximumAttachmentSize) {
                 throw new DiffException(String.format("The attachment [%s] is too big.", attachmentReference));
             }

@@ -134,7 +134,7 @@ class AttachmentDataURIConverterTest
     void simpleConversion(long sizeLimit) throws DiffException, IOException, XWikiException, AccessDeniedException
     {
         setUpDocument(ATTACHMENT_URL);
-        when(this.configuration.getMaximumDataURISize()).thenReturn(sizeLimit);
+        when(this.configuration.getMaximumContentSize()).thenReturn(sizeLimit);
 
         assertEquals(DATA_URI, this.converter.convert(ATTACHMENT_URL));
         verify(this.mockitoOldcore.getMockContextualAuthorizationManager()).checkAccess(Right.VIEW, DOCUMENT_REFERENCE);
@@ -206,7 +206,7 @@ class AttachmentDataURIConverterTest
         XWikiAttachment attachment = document.getAttachment(ATTACHMENT_NAME);
         attachment.setContent(new ByteArrayInputStream(new byte[1024 * 1024 + 1]));
         this.mockitoOldcore.getSpyXWiki().saveDocument(document, this.mockitoOldcore.getXWikiContext());
-        when(this.configuration.getMaximumDataURISize()).thenReturn(1024L * 1024L);
+        when(this.configuration.getMaximumContentSize()).thenReturn(1024L * 1024L);
 
         DiffException exception = assertThrows(DiffException.class, () -> this.converter.convert(ATTACHMENT_URL));
         assertEquals(String.format("The attachment [%s] is too big.", ATTACHMENT_REFERENCE), exception.getMessage());

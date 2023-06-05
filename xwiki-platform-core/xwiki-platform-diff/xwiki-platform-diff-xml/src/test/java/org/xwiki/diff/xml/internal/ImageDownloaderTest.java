@@ -152,7 +152,7 @@ class ImageDownloaderTest
     void throwsWhenContentLengthTooBig()
     {
         when(this.httpEntity.getContentLength()).thenReturn(1000000000L);
-        when(this.configuration.getMaximumDataURISize()).thenReturn(100L);
+        when(this.configuration.getMaximumContentSize()).thenReturn(100L);
         IOException ioException = assertThrows(IOException.class, () -> this.imageDownloader.download(IMAGE_URI));
         assertEquals(String.format("The content length of [%s] is too big.", IMAGE_URI), ioException.getMessage());
     }
@@ -169,7 +169,7 @@ class ImageDownloaderTest
                 return 1;
             }
         };
-        when(this.configuration.getMaximumDataURISize()).thenReturn(100L);
+        when(this.configuration.getMaximumContentSize()).thenReturn(100L);
 
         when(this.httpEntity.getContent()).thenReturn(inputStream);
         IOException ioException = assertThrows(IOException.class, () -> this.imageDownloader.download(IMAGE_URI));
@@ -183,10 +183,10 @@ class ImageDownloaderTest
         // Set different content lengths to test the different code paths.
         when(this.httpEntity.getContentLength()).thenReturn(contentLength);
         if (contentLength < 200) {
-            when(this.configuration.getMaximumDataURISize()).thenReturn(200L);
+            when(this.configuration.getMaximumContentSize()).thenReturn(200L);
         } else {
             // Test unlimited size.
-            when(this.configuration.getMaximumDataURISize()).thenReturn(0L);
+            when(this.configuration.getMaximumContentSize()).thenReturn(0L);
         }
         byte[] content = new byte[] { 1, 2, 3 };
         when(this.httpEntity.getContent()).thenReturn(new ByteArrayInputStream(content));

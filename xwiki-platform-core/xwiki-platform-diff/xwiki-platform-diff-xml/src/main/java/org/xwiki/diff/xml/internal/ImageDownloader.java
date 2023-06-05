@@ -136,7 +136,7 @@ public class ImageDownloader
                     throw new IOException(String.format("The content of [%s] is not an image.", uri));
                 }
 
-                long maximumSize = this.configuration.getMaximumDataURISize();
+                long maximumSize = this.configuration.getMaximumContentSize();
                 if (maximumSize > 0 && entity.getContentLength() > maximumSize) {
                     throw new IOException(String.format("The content length of [%s] is too big.", uri));
                 }

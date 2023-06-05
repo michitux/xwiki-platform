@@ -36,7 +36,7 @@ import org.xwiki.diff.xml.XMLDiffDataURIConverterConfiguration;
 @Singleton
 public class DefaultXMLDiffDataURIConverterConfiguration implements XMLDiffDataURIConverterConfiguration
 {
-    private static final String PREFIX = "diff.xml";
+    private static final String PREFIX = "diff.xml.dataURI";
 
     @Inject
     @Named("xwikiproperties")
@@ -49,15 +49,15 @@ public class DefaultXMLDiffDataURIConverterConfiguration implements XMLDiffDataU
     }
 
     @Override
-    public long getMaximumDataURISize()
+    public long getMaximumContentSize()
     {
-        return this.configurationSource.getProperty(getFullKeyName("maximumDataURISize"), Long.class, 1024L * 1024L);
+        return this.configurationSource.getProperty(getFullKeyName("maximumContentSize"), Long.class, 1024L * 1024L);
     }
 
     @Override
-    public String getDataURIConverterHint()
+    public String getConverterHint()
     {
-        return this.configurationSource.getProperty(getFullKeyName("dataURIConverterHint"), String.class, "attachment");
+        return this.configurationSource.getProperty(getFullKeyName("converterHint"), String.class, "attachment");
     }
 
     private String getFullKeyName(String shortKeyName)

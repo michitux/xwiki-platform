@@ -52,11 +52,11 @@ public class DefaultDataURIConverter implements DataURIConverter
     {
         try {
             DataURIConverter converter =
-                this.componentManager.getInstance(DataURIConverter.class, this.configuration.getDataURIConverterHint());
+                this.componentManager.getInstance(DataURIConverter.class, this.configuration.getConverterHint());
             return converter.convert(url);
         } catch (ComponentLookupException e) {
             throw new DiffException(String.format("Failed to find a data URI converter for hint [%s].",
-                this.configuration.getDataURIConverterHint()), e);
+                this.configuration.getConverterHint()), e);
         }
     }
 }

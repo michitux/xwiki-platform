@@ -78,7 +78,7 @@ class DefaultDataURIConverterTest
     @Test
     void convertWithUnknownHint()
     {
-        when(this.configuration.getDataURIConverterHint()).thenReturn("unknown");
+        when(this.configuration.getConverterHint()).thenReturn("unknown");
 
         DiffException exception = assertThrows(DiffException.class, () -> {
             this.defaultDataURIConverter.convert(IMAGE_URL);
@@ -90,7 +90,7 @@ class DefaultDataURIConverterTest
     @Test
     void convertWithAttachmentHint() throws DiffException
     {
-        when(this.configuration.getDataURIConverterHint()).thenReturn("attachment");
+        when(this.configuration.getConverterHint()).thenReturn("attachment");
 
         this.defaultDataURIConverter.convert(IMAGE_URL);
 
@@ -100,7 +100,7 @@ class DefaultDataURIConverterTest
     @Test
     void convertWithHttpHint() throws DiffException
     {
-        when(this.configuration.getDataURIConverterHint()).thenReturn("http");
+        when(this.configuration.getConverterHint()).thenReturn("http");
 
         this.defaultDataURIConverter.convert(IMAGE_URL);
 

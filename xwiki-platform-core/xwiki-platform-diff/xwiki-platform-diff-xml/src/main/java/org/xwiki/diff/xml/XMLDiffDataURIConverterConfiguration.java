@@ -24,10 +24,10 @@ import org.xwiki.diff.xml.internal.DataURIConverter;
 import org.xwiki.stability.Unstable;
 
 /**
- * Configuration for the XML diff module.
+ * Configuration for the data URI converter in the XML diff module.
  *
- * @since 14.10.11
- * @since 15.4RC1
+ * @since 14.10.13
+ * @since 15.5RC1
  * @version $Id$
  */
 @Unstable
@@ -42,10 +42,10 @@ public interface XMLDiffDataURIConverterConfiguration
     /**
      * @return the maximum size of the data to embed as data URI
      */
-    long getMaximumDataURISize();
+    long getMaximumContentSize();
 
     /**
      * @return the hint of the {@link DataURIConverter} to use
      */
-    String getDataURIConverterHint();
+    String getConverterHint();
 }
