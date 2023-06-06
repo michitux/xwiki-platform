@@ -31,6 +31,8 @@ import org.xwiki.diff.xml.XMLDiffDataURIConverterConfiguration;
  * Configuration for the XML diff.
  *
  * @version $Id$
+ * @since 14.10.13
+ * @since 15.5RC1
  */
 @Component
 @Singleton

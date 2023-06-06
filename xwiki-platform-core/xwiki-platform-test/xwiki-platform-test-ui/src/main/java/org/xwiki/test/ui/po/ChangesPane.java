@@ -122,6 +122,8 @@ public class ChangesPane extends BaseElement
 
     /**
      * @return the raw changes tab
+     * @since 14.10.13
+     * @since 15.5RC1
      */
     public RawChanges getRawChanges()
     {
@@ -134,6 +136,8 @@ public class ChangesPane extends BaseElement
 
     /**
      * @return the rendered changes tab
+     * @since 14.10.13
+     * @since 15.5RC1
      */
     public RenderedChanges getRenderedChanges()
     {

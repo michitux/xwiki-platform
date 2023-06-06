@@ -60,8 +60,8 @@ public interface AuthenticationConfiguration
 
     /**
      * @return the list of cookie domains to use for the authentication cookies. Domains are prefix with a dot.
-     * @since 14.10.11
-     * @since 15.4RC1
+     * @since 14.10.13
+     * @since 15.5RC1
      */
     @Unstable
     default List<String> getCookieDomains()

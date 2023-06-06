@@ -31,8 +31,8 @@ import org.xwiki.test.ui.po.BaseElement;
  * Represents the raw changes display (in a tab in the compare documents view or in the conflict view).
  *
  * @version $Id$
- * @since 14.10.11
- * @since 15.4RC1
+ * @since 14.10.13
+ * @since 15.5RC1
  */
 public class RawChanges extends BaseElement
 {

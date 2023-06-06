@@ -47,8 +47,8 @@ import com.xpn.xwiki.XWikiContext;
 /**
  * Implementation of {@link DataURIConverter} that uses an HTTP client to embed images.
  *
- * @since 14.10.11
- * @since 15.4RC1
+ * @since 14.10.13
+ * @since 15.5RC1
  * @version $Id$
  */
 @Component

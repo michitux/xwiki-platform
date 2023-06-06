@@ -29,8 +29,8 @@ import org.xwiki.test.ui.po.BaseElement;
  * Represents the rendered changes tab in the changes pane.
  *
  * @version $Id$
- * @since 14.10.11
- * @since 15.4RC1
+ * @since 14.10.13
+ * @since 15.5RC1
  */
 public class RenderedChanges extends BaseElement
 {

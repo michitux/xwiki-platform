@@ -57,8 +57,8 @@ import com.xpn.xwiki.web.XWikiServletRequestStub;
  * Attachment loading implementation of {@link DataURIConverter}.
  *
  * @version $Id$
- * @since 14.10.11
- * @since 15.4RC1
+ * @since 14.10.13
+ * @since 15.5RC1
  */
 @Component
 @Singleton
