@@ -1,6 +1,6 @@
 org.xwiki.diff.xml.internal.DefaultDataURIConverter
 org.xwiki.diff.xml.internal.HTTPDataURIConverter
 org.xwiki.diff.xml.internal.AttachmentDataURIConverter
-org.xwiki.diff.xml.internal.HTTPClientBuilderFactory
+org.xwiki.diff.xml.internal.HttpClientBuilderFactory
 org.xwiki.diff.xml.internal.ImageDownloader
 org.xwiki.diff.xml.internal.DefaultXMLDiffDataURIConverterConfiguration

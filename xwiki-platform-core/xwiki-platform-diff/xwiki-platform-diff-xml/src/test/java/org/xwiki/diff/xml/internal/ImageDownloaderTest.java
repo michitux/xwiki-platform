@@ -77,7 +77,7 @@ class ImageDownloaderTest
     private static final String IMAGE_CONTENT_TYPE = "image/png";
 
     @MockComponent
-    private HTTPClientBuilderFactory httpClientBuilderFactory;
+    private HttpClientBuilderFactory httpClientBuilderFactory;
 
     @MockComponent
     private Provider<XWikiContext> xwikiContextProvider;

@@ -62,7 +62,7 @@ public class ImageDownloader
     private static final String HEADER_COOKIE = "Cookie";
 
     @Inject
-    private HTTPClientBuilderFactory httpClientBuilderFactory;
+    private HttpClientBuilderFactory httpClientBuilderFactory;
 
     @Inject
     private Provider<XWikiContext> xcontextProvider;

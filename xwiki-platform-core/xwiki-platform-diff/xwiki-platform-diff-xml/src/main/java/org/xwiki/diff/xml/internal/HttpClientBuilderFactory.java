@@ -31,9 +31,9 @@ import org.xwiki.component.annotation.Component;
  * @since 15.5RC1
  * @version $Id$
  */
-@Component(roles = HTTPClientBuilderFactory.class)
+@Component(roles = HttpClientBuilderFactory.class)
 @Singleton
-public class HTTPClientBuilderFactory
+public class HttpClientBuilderFactory
 {
     /**
      * @return a new HTTPClientBuilder
