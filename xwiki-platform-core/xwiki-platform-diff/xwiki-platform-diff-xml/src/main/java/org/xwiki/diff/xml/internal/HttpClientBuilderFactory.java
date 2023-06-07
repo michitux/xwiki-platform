@@ -19,13 +19,19 @@
  */
 package org.xwiki.diff.xml.internal;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 
-import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.client5.http.impl.io.BasicHttpClientConnectionManager;
+import org.apache.hc.core5.util.Timeout;
 import org.xwiki.component.annotation.Component;
+import org.xwiki.diff.xml.XMLDiffDataURIConverterConfiguration;
 
 /**
- * Simple factory for HttpClientBuilder to help testing.
+ * Simple factory for HttpClientBuilder to help testing and set basic properties including user agent and timeouts.
  *
  * @since 14.10.13
  * @since 15.5RC1
@@ -35,6 +41,9 @@ import org.xwiki.component.annotation.Component;
 @Singleton
 public class HttpClientBuilderFactory
 {
+    @Inject
+    private XMLDiffDataURIConverterConfiguration configuration;
+
     /**
      * @return a new HTTPClientBuilder
      */
@@ -43,6 +52,21 @@ public class HttpClientBuilderFactory
         HttpClientBuilder result = HttpClientBuilder.create();
         result.useSystemProperties();
         result.setUserAgent("XWikiHTMLDiff");
+
+        // Set the connection timeout.
+        Timeout timeout = Timeout.ofSeconds(this.configuration.getHTTPTimeout());
+        ConnectionConfig connectionConfig = ConnectionConfig.custom()
+            .setConnectTimeout(timeout)
+            .setSocketTimeout(timeout)
+            .build();
+
+        BasicHttpClientConnectionManager cm = new BasicHttpClientConnectionManager();
+        cm.setConnectionConfig(connectionConfig);
+        result.setConnectionManager(cm);
+
+        // Set the response timeout.
+        result.setDefaultRequestConfig(RequestConfig.custom().setResponseTimeout(timeout).build());
+
         return result;
     }
 }

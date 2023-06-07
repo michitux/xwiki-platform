@@ -28,16 +28,15 @@ import java.util.List;
 import javax.inject.Provider;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.Header;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpStatus;
-import org.apache.http.ProtocolVersion;
-import org.apache.http.StatusLine;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.message.BasicStatusLine;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.HttpStatus;
+import org.apache.hc.core5.http.ProtocolVersion;
+import org.apache.hc.core5.http.io.HttpClientResponseHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -106,28 +105,29 @@ class ImageDownloaderTest
     @Mock
     private HttpEntity httpEntity;
 
-    @Mock
-    private Header contentTypeHeader;
-
     @BeforeEach
     public void setupMocks() throws IOException
     {
         when(this.httpClientBuilderFactory.create()).thenReturn(this.httpClientBuilder);
         when(this.httpClientBuilder.build()).thenReturn(this.httpClient);
-        when(this.httpClient.execute(any())).thenReturn(this.httpResponse);
+        when(this.httpClient.execute(any(ClassicHttpRequest.class), any(HttpClientResponseHandler.class)))
+            .then(invocation ->
+            {
+                HttpClientResponseHandler<?> responseHandler = invocation.getArgument(1);
+                return responseHandler.handleResponse(this.httpResponse);
+            });
         when(this.xwikiContextProvider.get()).thenReturn(this.xwikiContext);
         when(this.httpResponse.getEntity()).thenReturn(this.httpEntity);
-        StatusLine statusLine = new BasicStatusLine(HTTP_VERSION, HttpStatus.SC_OK, "OK");
-        when(this.httpResponse.getStatusLine()).thenReturn(statusLine);
-        when(this.httpEntity.getContentType()).thenReturn(this.contentTypeHeader);
-        when(this.contentTypeHeader.getValue()).thenReturn(IMAGE_CONTENT_TYPE);
+        when(this.httpResponse.getCode()).thenReturn(HttpStatus.SC_OK);
+        when(this.httpResponse.getReasonPhrase()).thenReturn("OK");
+        when(this.httpEntity.getContentType()).thenReturn(IMAGE_CONTENT_TYPE);
     }
 
     @Test
     void throwsOnNon200Status()
     {
-        StatusLine statusLine = new BasicStatusLine(HTTP_VERSION, HttpStatus.SC_NOT_FOUND, "Not Found");
-        when(this.httpResponse.getStatusLine()).thenReturn(statusLine);
+        when(this.httpResponse.getCode()).thenReturn(HttpStatus.SC_NOT_FOUND);
+        when(this.httpResponse.getReasonPhrase()).thenReturn("Not Found");
         IOException ioException = assertThrows(IOException.class, () -> this.imageDownloader.download(IMAGE_URI));
         assertEquals("404 Not Found", ioException.getMessage());
     }
@@ -135,7 +135,7 @@ class ImageDownloaderTest
     @Test
     void throwsWhenNonImageContentType()
     {
-        when(this.contentTypeHeader.getValue()).thenReturn("text/html");
+        when(this.httpEntity.getContentType()).thenReturn("text/html");
         IOException ioException = assertThrows(IOException.class, () -> this.imageDownloader.download(IMAGE_URI));
         assertEquals(String.format("The content of [%s] is not an image.", IMAGE_URI), ioException.getMessage());
     }
@@ -221,11 +221,11 @@ class ImageDownloaderTest
         when(this.httpEntity.getContent()).thenReturn(new ByteArrayInputStream(content));
         this.imageDownloader.download(IMAGE_URI);
 
-        ArgumentCaptor<HttpUriRequest> requestCaptor = ArgumentCaptor.forClass(HttpUriRequest.class);
-        verify(this.httpClient).execute(requestCaptor.capture());
+        ArgumentCaptor<ClassicHttpRequest> requestCaptor = ArgumentCaptor.forClass(ClassicHttpRequest.class);
+        verify(this.httpClient).execute(requestCaptor.capture(), any(HttpClientResponseHandler.class));
 
         // Verify that the cookies are passed to the HTTP client if it should do so.
-        HttpUriRequest httpRequest = requestCaptor.getValue();
+        ClassicHttpRequest httpRequest = requestCaptor.getValue();
         Header[] headers = httpRequest.getHeaders("Cookie");
         if (shouldSendCookie) {
             assertEquals(1, headers.length);

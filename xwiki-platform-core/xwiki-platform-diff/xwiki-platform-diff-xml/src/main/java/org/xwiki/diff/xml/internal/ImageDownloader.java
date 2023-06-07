@@ -31,14 +31,12 @@ import javax.servlet.http.HttpServletRequest;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.BoundedInputStream;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpStatus;
-import org.apache.http.StatusLine;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.HttpStatus;
 import org.xwiki.component.annotation.Component;
 import org.xwiki.diff.xml.XMLDiffDataURIConverterConfiguration;
 import org.xwiki.security.authentication.AuthenticationConfiguration;
@@ -122,59 +120,55 @@ public class ImageDownloader
 
         HttpGet getMethod = initializeGetMethod(uri);
 
-        try (CloseableHttpClient httpClient = httpClientBuilder.build();
-             CloseableHttpResponse response = httpClient.execute(getMethod))
-        {
-            StatusLine statusLine = response.getStatusLine();
-            if (statusLine.getStatusCode() == HttpStatus.SC_OK) {
-                HttpEntity entity = response.getEntity();
-                // Remove the content type parameters, such as the charset, so they don't influence the diff.
-                String contentType = entity.getContentType() != null ? entity.getContentType().getValue() : null;
-                contentType = StringUtils.substringBefore(contentType, ";");
+        try (CloseableHttpClient httpClient = httpClientBuilder.build()) {
+            return httpClient.execute(getMethod, response -> handleResponse(uri, response));
+        }
+    }
 
-                if (!StringUtils.startsWith(contentType, "image/")) {
-                    throw new IOException(String.format("The content of [%s] is not an image.", uri));
-                }
+    private DownloadResult handleResponse(URI uri, ClassicHttpResponse response) throws IOException
+    {
+        if (response.getCode() == HttpStatus.SC_OK) {
+            HttpEntity entity = response.getEntity();
+            // Remove the content type parameters, such as the charset, so they don't influence the diff.
+            String contentType = entity.getContentType();
+            contentType = StringUtils.substringBefore(contentType, ";");
 
-                long maximumSize = this.configuration.getMaximumContentSize();
-                if (maximumSize > 0 && entity.getContentLength() > maximumSize) {
-                    throw new IOException(String.format("The content length of [%s] is too big.", uri));
-                }
-
-                byte[] content;
-                if (maximumSize > 0) {
-                    // The content length is not always available (then it is negative), so we need to use a bounded
-                    // input stream to make sure we don't read more than the maximum size.
-                    try (BoundedInputStream boundedInputStream = new BoundedInputStream(entity.getContent(),
-                        maximumSize))
-                    {
-                        content = IOUtils.toByteArray(boundedInputStream);
-                    }
-
-                    if (content.length == maximumSize) {
-                        throw new IOException(String.format("The content of [%s] is too big.", uri));
-                    }
-                } else {
-                    content = IOUtils.toByteArray(entity.getContent());
-                }
-
-                return new DownloadResult(content, contentType);
-            } else {
-                throw new IOException(statusLine.getStatusCode() + " " + statusLine.getReasonPhrase());
+            if (!StringUtils.startsWith(contentType, "image/")) {
+                throw new IOException(String.format("The content of [%s] is not an image.", uri));
             }
+
+            long maximumSize = this.configuration.getMaximumContentSize();
+            if (maximumSize > 0 && entity.getContentLength() > maximumSize) {
+                throw new IOException(String.format("The content length of [%s] is too big.", uri));
+            }
+
+            byte[] content;
+            if (maximumSize > 0) {
+                // The content length is not always available (then it is negative), so we need to use a bounded
+                // input stream to make sure we don't read more than the maximum size.
+                try (BoundedInputStream boundedInputStream = new BoundedInputStream(entity.getContent(),
+                    maximumSize))
+                {
+                    content = IOUtils.toByteArray(boundedInputStream);
+                }
+
+                if (content.length == maximumSize) {
+                    throw new IOException(String.format("The content of [%s] is too big.", uri));
+                }
+            } else {
+                content = IOUtils.toByteArray(entity.getContent());
+            }
+
+            return new DownloadResult(content, contentType);
+        } else {
+            throw new IOException(response.getCode() + " " + response.getReasonPhrase());
         }
     }
 
     private HttpGet initializeGetMethod(URI uri)
     {
         HttpGet getMethod = new HttpGet(uri);
-        int timeoutMilliseconds = this.configuration.getHTTPTimeout() * 1000;
-        RequestConfig requestConfig = RequestConfig.custom()
-            .setConnectTimeout(timeoutMilliseconds)
-            .setSocketTimeout(timeoutMilliseconds)
-            .setConnectionRequestTimeout(timeoutMilliseconds)
-            .build();
-        getMethod.setConfig(requestConfig);
+
         XWikiRequest request = this.xcontextProvider.get().getRequest();
         if (request != null && matchesCookieDomain(uri.getHost(), request)) {
             // Copy the cookie header from the current request.
