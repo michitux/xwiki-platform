@@ -24,49 +24,29 @@ import javax.inject.Named;
 import javax.inject.Singleton;
 
 import org.xwiki.component.annotation.Component;
-import org.xwiki.component.manager.ComponentLookupException;
-import org.xwiki.component.manager.ComponentManager;
-import org.xwiki.diff.DiffException;
-import org.xwiki.diff.xml.XMLDiffDataURIConverterConfiguration;
+import org.xwiki.url.ExtendedURL;
 import org.xwiki.url.internal.URLValidator;
 
 /**
- * Default implementation of {@link DataURIConverter}, uses the configured one.
+ * Checks if the given URL is an attachment URL.
  *
  * @version $Id$
- * @since 11.10.1
- * @since 12.0RC1
+ * @since 14.10.14
+ * @since 15.5.1
+ * @since 15.6RC1
  */
 @Component
 @Singleton
-public class DefaultDataURIConverter implements DataURIConverter
+@Named("standardAttachment")
+public class AttachmentURLValidator implements URLValidator
 {
     @Inject
-    @Named("context")
-    private ComponentManager componentManager;
-
-    @Inject
-    private XMLDiffDataURIConverterConfiguration configuration;
-
-    @Named("attachment")
-    private DataURIConverter attachmentDataURIConverter;
-
-    @Named("http")
-    private DataURIConverter httpDataURIConverter;
-
     @Named("standardLocal")
-    private URLValidator urlValidator;
+    private URLValidator localURLValidator;
 
     @Override
-    public String convert(String url) throws DiffException
+    public boolean validate(ExtendedURL urlRepresentation)
     {
-        try {
-            DataURIConverter converter =
-                this.componentManager.getInstance(DataURIConverter.class, this.configuration.getConverterHint());
-            return converter.convert(url);
-        } catch (ComponentLookupException e) {
-            throw new DiffException(String.format("Failed to find a data URI converter for hint [%s].",
-                this.configuration.getConverterHint()), e);
-        }
+        return false;
     }
 }
