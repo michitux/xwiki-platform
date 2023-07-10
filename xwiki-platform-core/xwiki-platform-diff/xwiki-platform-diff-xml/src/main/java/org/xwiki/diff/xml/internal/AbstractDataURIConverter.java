@@ -25,7 +25,9 @@ import java.util.Base64;
 
 import org.xwiki.diff.DiffException;
 
+import com.xpn.xwiki.XWiki;
 import com.xpn.xwiki.XWikiContext;
+import com.xpn.xwiki.XWikiException;
 
 /**
  * Abstract base class for {@link DataURIConverter} implementations providing common helper methods.
@@ -48,13 +50,13 @@ public abstract class AbstractDataURIConverter implements DataURIConverter
     {
         URL absoluteURL;
         try {
-            if (xcontext.getRequest() != null && xcontext.getRequest().getRequestURL() != null) {
-                URL requestURL = new URL(xcontext.getRequest().getRequestURL().toString());
+            if (xcontext.getRequest() != null) {
+                URL requestURL = XWiki.getRequestURL(xcontext.getRequest());
                 absoluteURL = new URL(requestURL, url);
             } else {
                 absoluteURL = new URL(url);
             }
-        } catch (MalformedURLException e) {
+        } catch (MalformedURLException | XWikiException e) {
             throw new DiffException(String.format("Failed to resolve [%s] to an absolute URL.", url), e);
         }
         return absoluteURL;
