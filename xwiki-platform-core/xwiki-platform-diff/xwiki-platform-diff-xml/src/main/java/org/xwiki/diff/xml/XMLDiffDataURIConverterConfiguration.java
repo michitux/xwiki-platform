@@ -20,7 +20,6 @@
 package org.xwiki.diff.xml;
 
 import org.xwiki.component.annotation.Role;
-import org.xwiki.diff.xml.internal.DataURIConverter;
 import org.xwiki.stability.Unstable;
 
 /**
@@ -45,7 +44,7 @@ public interface XMLDiffDataURIConverterConfiguration
     long getMaximumContentSize();
 
     /**
-     * @return the hint of the {@link DataURIConverter} to use
+     * @return true if the data URI converter is enabled
      */
-    String getConverterHint();
+    boolean isEnabled();
 }

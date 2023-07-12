@@ -1561,13 +1561,13 @@ edit.defaultEditor.org.xwiki.rendering.block.XDOM#wysiwyg=$xwikiPropertiesDefaul
 #-------------------------------------------------------------------------------------
 
 #-# [Since 14.10.13, 15.5RC1]
-#-# Configure the method used to embed images into the XML diff output as data URI to compare their content instead of
-#-# their URL.
-#-# Available options are:
-#-# - "attachment": only attachments are embedded
-#-# - "http": URLs from any trusted domain are embedded by downloading them via HTTP
-#-# Default is "attachment".
-# diff.xml.dataURI.converterHint = attachment
+#-# If the compared documents contain images, they can be embedded as data URI to compare the images themselves
+#-# instead of their URLs. For this, images are downloaded via HTTP and embedded as data URI. Images are only
+#-# downloaded from trusted domains when enabled above. Still, this can be a security and stability risk as
+#-# downloading images can easily increase the server load. If this option is set to "false", no images are
+#-# downloaded by the diff and images are compared by URL instead.
+#-# Default is "true".
+# diff.xml.dataURI.enabled = true
 
 #-# [Since 14.10.13, 15.5RC1]
 #-# Configure the maximum size in bytes of an image to be embedded into the XML diff output as data URI.
@@ -1576,7 +1576,6 @@ edit.defaultEditor.org.xwiki.rendering.block.XDOM#wysiwyg=$xwikiPropertiesDefaul
 
 #-# [Since 14.10.13, 15.5RC1]
 #-# Configure the timeout in seconds for downloading an image via HTTP to embed it into the XML diff output as data URI.
-#-# This is only used when the "http" converter is used.
 #-# Default is 10 seconds.
 # diff.xml.dataURI.httpTimeout = 10
 

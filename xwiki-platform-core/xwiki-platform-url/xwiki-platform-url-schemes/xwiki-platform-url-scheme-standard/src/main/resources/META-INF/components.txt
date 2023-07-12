@@ -9,4 +9,3 @@ org.xwiki.url.internal.standard.DomainWikiReferenceExtractor
 org.xwiki.url.internal.standard.PathWikiReferenceExtractor
 org.xwiki.url.internal.standard.resources.ResourcesResourceReferenceResolver
 org.xwiki.url.internal.standard.skins.SkinsResourceReferenceResolver
-org.xwiki.url.internal.standard.StandardLocalURLValidator

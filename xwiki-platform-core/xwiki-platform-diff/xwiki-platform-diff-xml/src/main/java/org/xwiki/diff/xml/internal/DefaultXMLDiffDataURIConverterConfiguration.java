@@ -57,13 +57,14 @@ public class DefaultXMLDiffDataURIConverterConfiguration implements XMLDiffDataU
     }
 
     @Override
-    public String getConverterHint()
+    public boolean isEnabled()
     {
-        return this.configurationSource.getProperty(getFullKeyName("converterHint"), String.class, "attachment");
+        return this.configurationSource.getProperty(getFullKeyName("enabled"), Boolean.class, true);
     }
 
     private String getFullKeyName(String shortKeyName)
     {
         return String.format("%s.%s", PREFIX, shortKeyName);
     }
+
 }
