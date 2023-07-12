@@ -24,6 +24,8 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.List;
+import java.util.Map;
 
 import javax.inject.Provider;
 
@@ -64,8 +66,6 @@ class HTTPDataURIConverterTest
     private static final String CURRENT_USER = "XWiki.CurrentUser";
 
     private static final String CACHE_PREFIX = CURRENT_USER.length() + ":" + CURRENT_USER + ":";
-
-    private static final String REQUEST_URL = "http://localhost:8080/xwiki";
 
     private static final String URL_PREFIX = "http://localhost:8080";
 
@@ -116,8 +116,10 @@ class HTTPDataURIConverterTest
 
         XWikiContext xwikiContext = mock();
         when(this.xwikiContextProvider.get()).thenReturn(xwikiContext);
-        XWikiServletRequestStub request = new XWikiServletRequestStub();
-        request.setrequestURL(new StringBuffer(REQUEST_URL));
+        XWikiServletRequestStub request = new XWikiServletRequestStub.Builder()
+            .setHeaders(Map.of("forwarded", List.of("host=localhost:8080;proto=http")))
+            .build();
+        request.setRequestURI("/xwiki");
         when(xwikiContext.getRequest()).thenReturn(request);
     }
 

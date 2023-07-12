@@ -46,7 +46,7 @@ import org.xwiki.wiki.manager.WikiManagerException;
  * @since 15.6RC1
  */
 @Component
-@Named("localStandard")
+@Named("standardLocal")
 @Singleton
 public class StandardLocalURLValidator implements URLValidator
 {

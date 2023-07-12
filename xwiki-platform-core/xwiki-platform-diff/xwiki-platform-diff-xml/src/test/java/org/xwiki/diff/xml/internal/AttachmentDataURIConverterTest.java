@@ -21,8 +21,9 @@ package org.xwiki.diff.xml.internal;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.List;
+import java.util.Map;
 
 import javax.inject.Named;
 
@@ -33,14 +34,15 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.xwiki.diff.DiffException;
 import org.xwiki.diff.xml.XMLDiffDataURIConverterConfiguration;
-import org.xwiki.model.EntityType;
 import org.xwiki.model.reference.AttachmentReference;
+import org.xwiki.model.reference.AttachmentReferenceResolver;
 import org.xwiki.model.reference.DocumentReference;
-import org.xwiki.model.reference.EntityReferenceResolver;
+import org.xwiki.resource.CreateResourceReferenceException;
 import org.xwiki.security.authorization.AccessDeniedException;
 import org.xwiki.security.authorization.Right;
 import org.xwiki.test.junit5.mockito.InjectMockComponents;
 import org.xwiki.test.junit5.mockito.MockComponent;
+import org.xwiki.url.ExtendedURL;
 
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
@@ -83,11 +85,9 @@ class AttachmentDataURIConverterTest
 
     private static final String BASE_URL = "https://example.com";
 
-    private static final String REQUEST_URL = BASE_URL + "/xwiki/bin/view/Space/Page";
-
     @MockComponent
-    @Named("resource/standardURL")
-    private EntityReferenceResolver<String> resolver;
+    @Named("downloadURL")
+    private AttachmentReferenceResolver<ExtendedURL> resolver;
 
     @MockComponent
     private DocumentRevisionProvider documentRevisionProvider;
@@ -105,11 +105,13 @@ class AttachmentDataURIConverterTest
     private XWikiPluginManager mockPluginManager;
 
     @BeforeEach
-    void configureBaseURL() throws MalformedURLException
+    void configureBaseURL()
     {
         XWikiContext context = this.mockitoOldcore.getXWikiContext();
-        XWikiServletRequestStub request =
-            new XWikiServletRequestStub.Builder().setRequestURL(new URL(REQUEST_URL)).build();
+        XWikiServletRequestStub request = new XWikiServletRequestStub.Builder()
+            .setHeaders(Map.of("forwarded", List.of("host=example.com;proto=https")))
+            .build();
+        request.setRequestURI("/xwiki/bin/view/Space/Page");
         context.setRequest(request);
     }
 
@@ -119,7 +121,6 @@ class AttachmentDataURIConverterTest
         when(this.mockPluginManager.downloadAttachment(any(XWikiAttachment.class), any()))
             .then(invocation -> invocation.getArgument(0));
         when(this.mockitoOldcore.getSpyXWiki().getPluginManager()).thenReturn(this.mockPluginManager);
-
     }
 
     @Test
@@ -131,7 +132,8 @@ class AttachmentDataURIConverterTest
 
     @ParameterizedTest
     @ValueSource(longs = { 0, 200 })
-    void simpleConversion(long sizeLimit) throws DiffException, IOException, XWikiException, AccessDeniedException
+    void simpleConversion(long sizeLimit)
+        throws DiffException, IOException, XWikiException, AccessDeniedException, CreateResourceReferenceException
     {
         setUpDocument(ATTACHMENT_URL);
         when(this.configuration.getMaximumContentSize()).thenReturn(sizeLimit);
@@ -141,7 +143,7 @@ class AttachmentDataURIConverterTest
     }
 
     @Test
-    void conversionWithRevision() throws DiffException, IOException, XWikiException
+    void conversionWithRevision() throws DiffException, IOException, XWikiException, CreateResourceReferenceException
     {
         String revision = "1.1";
         String url = ATTACHMENT_URL + "?rev=" + revision;
@@ -170,7 +172,7 @@ class AttachmentDataURIConverterTest
     }
 
     @Test
-    void conversionWithResizing() throws DiffException, IOException, XWikiException
+    void conversionWithResizing() throws DiffException, IOException, XWikiException, CreateResourceReferenceException
     {
         String url = ATTACHMENT_URL + "?width=200&height=100";
 
@@ -199,7 +201,7 @@ class AttachmentDataURIConverterTest
     }
 
     @Test
-    void tooLargeImageFails() throws XWikiException, IOException
+    void tooLargeImageFails() throws XWikiException, IOException, CreateResourceReferenceException
     {
         XWikiDocument document = setUpDocument(ATTACHMENT_URL);
 
@@ -212,9 +214,10 @@ class AttachmentDataURIConverterTest
         assertEquals(String.format("The attachment [%s] is too big.", ATTACHMENT_REFERENCE), exception.getMessage());
     }
 
-    private XWikiDocument setUpDocument(String url) throws IOException, XWikiException
+    private XWikiDocument setUpDocument(String url) throws IOException, XWikiException, CreateResourceReferenceException
     {
-        when(this.resolver.resolve(BASE_URL + url, EntityType.ATTACHMENT)).thenReturn(ATTACHMENT_REFERENCE);
+        when(this.resolver.resolve(new ExtendedURL(new URL(BASE_URL + url), null)))
+            .thenReturn(ATTACHMENT_REFERENCE);
 
         XWikiDocument document = new XWikiDocument(DOCUMENT_REFERENCE);
         document.setAttachment(ATTACHMENT_NAME, new ByteArrayInputStream("attachmentContent".getBytes()),

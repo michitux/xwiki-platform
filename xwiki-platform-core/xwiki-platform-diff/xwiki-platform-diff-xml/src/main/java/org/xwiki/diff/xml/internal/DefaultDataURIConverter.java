@@ -28,7 +28,6 @@ import org.xwiki.component.manager.ComponentLookupException;
 import org.xwiki.component.manager.ComponentManager;
 import org.xwiki.diff.DiffException;
 import org.xwiki.diff.xml.XMLDiffDataURIConverterConfiguration;
-import org.xwiki.url.internal.URLValidator;
 
 /**
  * Default implementation of {@link DataURIConverter}, uses the configured one.
@@ -47,15 +46,6 @@ public class DefaultDataURIConverter implements DataURIConverter
 
     @Inject
     private XMLDiffDataURIConverterConfiguration configuration;
-
-    @Named("attachment")
-    private DataURIConverter attachmentDataURIConverter;
-
-    @Named("http")
-    private DataURIConverter httpDataURIConverter;
-
-    @Named("standardLocal")
-    private URLValidator urlValidator;
 
     @Override
     public String convert(String url) throws DiffException

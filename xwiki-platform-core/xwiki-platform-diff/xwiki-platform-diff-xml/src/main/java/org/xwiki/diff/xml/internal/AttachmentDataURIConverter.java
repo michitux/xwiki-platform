@@ -20,7 +20,8 @@
 package org.xwiki.diff.xml.internal;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.net.URL;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -30,20 +31,17 @@ import javax.inject.Provider;
 import javax.inject.Singleton;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.http.NameValuePair;
-import org.apache.http.client.utils.URLEncodedUtils;
 import org.xwiki.component.annotation.Component;
 import org.xwiki.diff.DiffException;
 import org.xwiki.diff.xml.XMLDiffDataURIConverterConfiguration;
-import org.xwiki.model.EntityType;
 import org.xwiki.model.reference.AttachmentReference;
+import org.xwiki.model.reference.AttachmentReferenceResolver;
 import org.xwiki.model.reference.DocumentReference;
-import org.xwiki.model.reference.EntityReference;
-import org.xwiki.model.reference.EntityReferenceResolver;
+import org.xwiki.resource.CreateResourceReferenceException;
 import org.xwiki.security.authorization.AuthorizationException;
 import org.xwiki.security.authorization.ContextualAuthorizationManager;
 import org.xwiki.security.authorization.Right;
+import org.xwiki.url.ExtendedURL;
 
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
@@ -67,8 +65,6 @@ public class AttachmentDataURIConverter extends AbstractDataURIConverter
 {
     private static final String REV_PARAMETER = "rev";
 
-    private static final String QUERY_SEPARATOR = "?";
-
     private static final String RECYCLE_BIN_ID_PARAMETER = "rid";
 
     private static final String ID = "id";
@@ -77,8 +73,8 @@ public class AttachmentDataURIConverter extends AbstractDataURIConverter
     private Provider<XWikiContext> xcontextProvider;
 
     @Inject
-    @Named("resource/standardURL")
-    private EntityReferenceResolver<String> resolver;
+    @Named("downloadURL")
+    private AttachmentReferenceResolver<ExtendedURL> attachmentReferenceResolver;
 
     @Inject
     private ContextualAuthorizationManager authorization;
@@ -95,18 +91,21 @@ public class AttachmentDataURIConverter extends AbstractDataURIConverter
         }
 
         XWikiContext context = this.xcontextProvider.get();
-        String absoluteURL = getAbsoluteURL(url, context).toString();
-
-        // Get the attachment reference corresponding to the URL.
-        EntityReference entityReference = this.resolver.resolve(absoluteURL, EntityType.ATTACHMENT);
-        AttachmentReference attachmentReference;
+        URL absoluteURL = getAbsoluteURL(url, context);
+        ExtendedURL extendedURL;
         try {
-            attachmentReference = new AttachmentReference(entityReference);
-        } catch (IllegalArgumentException e) {
-            throw new DiffException("Failed to resolve the URL [" + absoluteURL + "] to an attachment reference.");
+            extendedURL = new ExtendedURL(absoluteURL, context.getRequest().getContextPath());
+        } catch (CreateResourceReferenceException e) {
+            throw new DiffException(String.format("Failed to create an extended URL from the URL [%s].", url), e);
         }
 
-        Map<String, String[]> parameterMap = getParameterMap(url);
+        AttachmentReference attachmentReference = this.attachmentReferenceResolver.resolve(extendedURL);
+
+        if (attachmentReference == null) {
+            throw new DiffException(String.format("Failed to resolve an attachment reference from the URL [%s].", url));
+        }
+
+        Map<String, List<String>> parameterMap = extendedURL.getParameters();
         try {
             XWikiAttachment attachment = getAttachment(context, attachmentReference, parameterMap);
 
@@ -132,7 +131,7 @@ public class AttachmentDataURIConverter extends AbstractDataURIConverter
     }
 
     private XWikiAttachment getAttachment(XWikiContext context, AttachmentReference attachmentReference,
-        Map<String, String[]> parameterMap) throws AuthorizationException, XWikiException, DiffException
+        Map<String, List<String>> parameterMap) throws AuthorizationException, XWikiException, DiffException
     {
         DocumentReference documentReference = attachmentReference.getDocumentReference();
 
@@ -147,14 +146,14 @@ public class AttachmentDataURIConverter extends AbstractDataURIConverter
         // The following code closely follows the code of DownloadRevAction.
         if (parameterMap.containsKey(RECYCLE_BIN_ID_PARAMETER) && context.getWiki().hasAttachmentRecycleBin(context)) {
             // Retrieve the attachment from the recycle bin.
-            int recycleId = Integer.parseInt(parameterMap.get(RECYCLE_BIN_ID_PARAMETER)[0]);
+            int recycleId = Integer.parseInt(parameterMap.get(RECYCLE_BIN_ID_PARAMETER).get(0));
             attachment = new XWikiAttachment(document, filename);
             attachment = context.getWiki().getAttachmentRecycleBinStore()
                 .restoreFromRecycleBin(attachment, recycleId, context, true);
         } else if (parameterMap.containsKey(ID)) {
             // Retrieve the attachment from the list of attachments by position as this is also supported by
             // DownloadRevAction.
-            int id = Integer.parseInt(parameterMap.get(ID)[0]);
+            int id = Integer.parseInt(parameterMap.get(ID).get(0));
             attachment = document.getAttachmentList().get(id);
         } else {
             attachment = document.getAttachment(filename);
@@ -166,7 +165,7 @@ public class AttachmentDataURIConverter extends AbstractDataURIConverter
 
         if (parameterMap.containsKey(REV_PARAMETER)) {
             synchronized (attachment) {
-                XWikiAttachment oldAttachment = attachment.getAttachmentRevision(parameterMap.get(REV_PARAMETER)[0],
+                XWikiAttachment oldAttachment = attachment.getAttachmentRevision(parameterMap.get(REV_PARAMETER).get(0),
                     context);
                 if (oldAttachment != null) {
                     attachment = oldAttachment;
@@ -185,7 +184,7 @@ public class AttachmentDataURIConverter extends AbstractDataURIConverter
      * @param xcontext the XWiki context
      * @return the resized attachment or the original attachment if no resizing is necessary
      */
-    private XWikiAttachment resizeImage(XWikiAttachment attachment, Map<String, String[]> parameterMap,
+    private XWikiAttachment resizeImage(XWikiAttachment attachment, Map<String, List<String>> parameterMap,
         XWikiContext xcontext)
     {
         // Backup the request to be able to restore it later.
@@ -194,8 +193,10 @@ public class AttachmentDataURIConverter extends AbstractDataURIConverter
         try {
             // The image plugin reads the request parameters to get the image size, so fake a request with the
             // parameters.
+            Map<String, String[]> requestParameters = parameterMap.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toArray(new String[0])));
             XWikiRequest stubRequest =
-                new XWikiServletRequestStub.Builder().setRequestParameters(parameterMap).build();
+                new XWikiServletRequestStub.Builder().setRequestParameters(requestParameters).build();
             xcontext.setRequest(stubRequest);
 
             XWikiPluginManager plugins = xcontext.getWiki().getPluginManager();
@@ -211,21 +212,5 @@ public class AttachmentDataURIConverter extends AbstractDataURIConverter
         String contentType = attachment.getMimeType(xcontext);
         byte[] content = IOUtils.toByteArray(attachment.getContentInputStream(xcontext));
         return getDataURI(contentType, content);
-    }
-
-    private Map<String, String[]> getParameterMap(String url)
-    {
-        Map<String, String[]> parameterMap;
-        if (url.contains(QUERY_SEPARATOR)) {
-            String query = StringUtils.substringAfter(url, QUERY_SEPARATOR);
-            // Group the parameters by name and create an array for each key.
-            parameterMap = URLEncodedUtils.parse(query, StandardCharsets.UTF_8).stream()
-                .filter(pair -> StringUtils.isNotBlank(pair.getName()))
-                .collect(Collectors.groupingBy(NameValuePair::getName, Collectors.mapping(NameValuePair::getValue,
-                    Collectors.collectingAndThen(Collectors.toList(), list -> list.toArray(new String[0])))));
-        } else {
-            parameterMap = Map.of();
-        }
-        return parameterMap;
     }
 }
