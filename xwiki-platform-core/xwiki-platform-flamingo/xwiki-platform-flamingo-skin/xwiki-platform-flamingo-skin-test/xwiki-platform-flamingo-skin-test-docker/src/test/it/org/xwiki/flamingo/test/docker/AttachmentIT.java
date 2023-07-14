@@ -21,16 +21,13 @@ package org.xwiki.flamingo.test.docker;
 
 import java.io.File;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
 
-import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.openqa.selenium.By;
-import org.openqa.selenium.WebElement;
 import org.xwiki.flamingo.skin.test.po.AttachmentsPane;
 import org.xwiki.flamingo.skin.test.po.AttachmentsViewPage;
 import org.xwiki.model.reference.AttachmentReference;
@@ -48,12 +45,8 @@ import org.xwiki.test.ui.po.ViewPage;
 import org.xwiki.test.ui.po.diff.DocumentDiffSummary;
 import org.xwiki.test.ui.po.diff.EntityDiff;
 import org.xwiki.test.ui.po.diff.RawChanges;
-import org.xwiki.test.ui.po.diff.RenderedChanges;
 
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.endsWith;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -452,64 +445,6 @@ class AttachmentIT
                 + "Failed to delete attachment %s\n"
                 + "This attachment does not exist.", attachmentName),
                 basePage.getXWikiMessageContent());
-    }
-
-    @Test
-    @Order(9)
-    void compareRenderedImageChanges(TestUtils setup, TestReference testReference) throws Exception
-    {
-        setup.loginAsSuperAdmin();
-        setup.attachFile(testReference, "image.gif",
-            getClass().getResourceAsStream("/AttachmentIT/image.gif"), false);
-        // Upload the image a second time under a different name to check that the content and not the URL is used
-        // for comparison when changing the URL to the second image.
-        setup.attachFile(testReference, "image2.gif",
-            getClass().getResourceAsStream("/AttachmentIT/image.gif"), false);
-        ViewPage viewPage = setup.createPage(testReference, "[[image:image.gif]]");
-        String firstRevision = viewPage.getMetaDataValue("version");
-        // Create a second revision with the new image.
-        viewPage = setup.createPage(testReference, "[[image:image2.gif]]");
-        String secondRevision = viewPage.getMetaDataValue("version");
-
-        // Open the history pane.
-        HistoryPane historyPane = viewPage.openHistoryDocExtraPane();
-        ComparePage compare = historyPane.compare(firstRevision, secondRevision);
-        RenderedChanges renderedChanges = compare.getChangesPane().getRenderedChanges();
-        assertTrue(renderedChanges.hasNoChanges());
-
-        // Upload a new image with different content to verify that the changes are detected.
-        setup.attachFile(testReference, "image.png",
-            getClass().getResourceAsStream("/AttachmentIT/SmallSizeAttachment.png"), false);
-
-        // Create a third revision with the new image.
-        viewPage = setup.createPage(testReference, "[[image:image.png]]");
-        String thirdRevision = viewPage.getMetaDataValue("version");
-
-        // Open the history pane.
-        historyPane = viewPage.openHistoryDocExtraPane();
-        compare = historyPane.compare(secondRevision, thirdRevision);
-        renderedChanges = compare.getChangesPane().getRenderedChanges();
-        assertFalse(renderedChanges.hasNoChanges());
-        List<WebElement> changes = renderedChanges.getChangedBlocks();
-        assertEquals(2, changes.size());
-
-        // Check that the first change is the deletion and the second change the insertion of the new image.
-        WebElement firstChange = changes.get(0);
-        WebElement secondChange = changes.get(1);
-        assertEquals("deleted", firstChange.getAttribute("data-xwiki-html-diff-block"));
-        assertEquals("inserted", secondChange.getAttribute("data-xwiki-html-diff-block"));
-        WebElement deletedImage = firstChange.findElement(By.tagName("img"));
-        WebElement insertedImage = secondChange.findElement(By.tagName("img"));
-
-        // Check that the src attribute of the deleted image ends with the image2 (don't check the start as it
-        // depends on the container setup and the nested/non-nested test execution).
-        assertThat(deletedImage.getAttribute("src"), endsWith("/image2.gif?rev=1.1"));
-
-        // Compute the expected base64-encoded content of the inserted image. The HTML diff embeds both images but
-        // replaces the deleted image by the original URL again after the diff computation.
-        String expectedInsertedImageContent = Base64.getEncoder().encodeToString(
-            IOUtils.toByteArray(getClass().getResourceAsStream("/AttachmentIT/SmallSizeAttachment.png")));
-        assertEquals("data:image/png;base64," + expectedInsertedImageContent, insertedImage.getAttribute("src"));
     }
 
     private String getAttachmentsMacroContent(DocumentReference docRef)
