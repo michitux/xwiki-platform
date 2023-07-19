@@ -19,7 +19,8 @@
  */
 package org.xwiki.flamingo.test.docker;
 
-import java.net.URL;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Base64;
 import java.util.List;
 
@@ -28,11 +29,11 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebElement;
+import org.xwiki.model.reference.AttachmentReference;
 import org.xwiki.test.docker.junit5.TestReference;
 import org.xwiki.test.docker.junit5.UITest;
 import org.xwiki.test.ui.TestUtils;
 import org.xwiki.test.ui.po.ComparePage;
-import org.xwiki.test.ui.po.HistoryPane;
 import org.xwiki.test.ui.po.ViewPage;
 import org.xwiki.test.ui.po.diff.RenderedChanges;
 
@@ -51,36 +52,59 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 })
 class CompareIT
 {
+    private static final String ATTACHMENT_NAME_1 = "image.gif";
+
+    private static final String ATTACHMENT_NAME_2 = "image2.gif";
+
+    private static final String ATTACHMENT_NAME_3 = "image.png";
+
+    private static final String IMAGE_SYNTAX = "[[image:%s]]";
+
+    private String getLocalAttachmentURL(TestUtils setup, TestReference testReference, String attachmentName)
+        throws URISyntaxException
+    {
+        AttachmentReference attachmentReference = new AttachmentReference(attachmentName, testReference);
+        URI attachmentURL = new URI(setup.getURL(attachmentReference, "download", null));
+        // Replace host and port with localhost and 8080 to make the URL usable from the container.
+        return (new URI("http", null, "localhost", 8080, attachmentURL.getPath(),
+            attachmentURL.getQuery(), attachmentURL.getFragment())).toString();
+    }
+
     @Test
     @Order(1)
     void compareRenderedImageChanges(TestUtils setup, TestReference testReference) throws Exception
     {
         setup.loginAsSuperAdmin();
-        String imageSyntax = "[[image:%s]]";
-        // Use picsum.photos as image source as the XWiki installation in Docker cannot access itself to get the
-        // image as attachment.
-        String firstImage = "https://picsum.photos/seed/test/90/90?v=1";
-        ViewPage viewPage = setup.createPage(testReference, String.format(imageSyntax, firstImage));
+        setup.attachFile(testReference, ATTACHMENT_NAME_1,
+            getClass().getResourceAsStream("/AttachmentIT/image.gif"), false);
+        // Upload the image a second time under a different name to check that the content and not the URL is used
+        // for comparison when changing the URL to the second image.
+        setup.attachFile(testReference, ATTACHMENT_NAME_2,
+            getClass().getResourceAsStream("/AttachmentIT/image.gif"), false);
+        String url1 = getLocalAttachmentURL(setup, testReference, ATTACHMENT_NAME_1);
+        ViewPage viewPage = setup.createPage(testReference, String.format(IMAGE_SYNTAX, url1));
         String firstRevision = viewPage.getMetaDataValue("version");
-        // Create a second revision with a different URL but same image content.
-        String secondImage = "https://picsum.photos/seed/test/90/90?v=2";
-        viewPage = setup.createPage(testReference, String.format(imageSyntax, secondImage));
+        // Create a second revision with the new image.
+        String url2 = getLocalAttachmentURL(setup, testReference, ATTACHMENT_NAME_2);
+        viewPage = setup.createPage(testReference, String.format(IMAGE_SYNTAX, url2));
         String secondRevision = viewPage.getMetaDataValue("version");
 
         // Open the history pane.
-        HistoryPane historyPane = viewPage.openHistoryDocExtraPane();
-        ComparePage compare = historyPane.compare(firstRevision, secondRevision);
+        ComparePage compare = viewPage.openHistoryDocExtraPane().compare(firstRevision, secondRevision);
         RenderedChanges renderedChanges = compare.getChangesPane().getRenderedChanges();
         assertTrue(renderedChanges.hasNoChanges());
 
-        // Create a third revision with a different image.
-        String thirdImage = "https://picsum.photos/seed/test2/90/90";
-        viewPage = setup.createPage(testReference, String.format(imageSyntax, thirdImage));
+        // Upload a new image with different content to verify that the changes are detected.
+        setup.attachFile(testReference, ATTACHMENT_NAME_3,
+            getClass().getResourceAsStream("/AttachmentIT/SmallSizeAttachment.png"), false);
+
+        // Create a third revision with the new image.
+        String url3 = getLocalAttachmentURL(setup, testReference, ATTACHMENT_NAME_3);
+        viewPage = setup.createPage(testReference, String.format(IMAGE_SYNTAX, url3));
         String thirdRevision = viewPage.getMetaDataValue("version");
 
         // Open the history pane.
-        historyPane = viewPage.openHistoryDocExtraPane();
-        compare = historyPane.compare(secondRevision, thirdRevision);
+        compare = viewPage.openHistoryDocExtraPane().compare(secondRevision, thirdRevision);
         renderedChanges = compare.getChangesPane().getRenderedChanges();
         assertFalse(renderedChanges.hasNoChanges());
         List<WebElement> changes = renderedChanges.getChangedBlocks();
@@ -94,13 +118,14 @@ class CompareIT
         WebElement deletedImage = firstChange.findElement(By.tagName("img"));
         WebElement insertedImage = secondChange.findElement(By.tagName("img"));
 
-        // Check that the src attribute of the deleted image is the original URL.
-        assertEquals(secondImage, deletedImage.getAttribute("src"));
+        // Check that the src attribute of the deleted image ends with the image2 (don't check the start as it
+        // depends on the container setup and the nested/non-nested test execution).
+        assertEquals(url2, deletedImage.getAttribute("src"));
 
-        // Compute the expected base64-encoded content of the third image. The HTML diff embeds both images but
+        // Compute the expected base64-encoded content of the inserted image. The HTML diff embeds both images but
         // replaces the deleted image by the original URL again after the diff computation.
         String expectedInsertedImageContent = Base64.getEncoder().encodeToString(
-            IOUtils.toByteArray(new URL(thirdImage).openStream()));
-        assertEquals("data:image/jpeg;base64," + expectedInsertedImageContent, insertedImage.getAttribute("src"));
+            IOUtils.toByteArray(getClass().getResourceAsStream("/AttachmentIT/SmallSizeAttachment.png")));
+        assertEquals("data:image/png;base64," + expectedInsertedImageContent, insertedImage.getAttribute("src"));
     }
 }
