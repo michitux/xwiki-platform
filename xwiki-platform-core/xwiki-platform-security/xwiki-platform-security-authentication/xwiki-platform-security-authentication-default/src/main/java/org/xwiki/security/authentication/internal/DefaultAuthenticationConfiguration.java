@@ -87,7 +87,7 @@ public class DefaultAuthenticationConfiguration implements AuthenticationConfigu
     @Override
     public List<String> getCookieDomains()
     {
-        List<?> rawValues = this.xwikiCfgConfiguration.getProperty("xwiki.authentication.cookieDomains", List.class,
+        List<?> rawValues = this.xwikiCfgConfiguration.getProperty("xwiki.authentication.cookiedomains", List.class,
             List.of());
         return rawValues.stream()
             .map(Object::toString)
