@@ -19,13 +19,20 @@
  */
 package org.xwiki.flamingo.test.docker;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openqa.selenium.By;
+import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.test.docker.junit5.TestReference;
 import org.xwiki.test.docker.junit5.UITest;
 import org.xwiki.test.ui.TestUtils;
 import org.xwiki.test.ui.po.SuggestInputElement;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Functional tests for the Page Picker.
@@ -35,6 +42,11 @@ import org.xwiki.test.ui.po.SuggestInputElement;
 @UITest
 class PagePickerIT
 {
+    private static final String PICKER_ID = "pagePickerTest";
+
+    private static final String PICKER_TEMPLATE =
+        "{{velocity}}{{html}}#pagePicker({'id': '%s'}){{/html}}{{/velocity}}";
+
     /**
      * See XWIKI-16078: Selected (and deleted) users/subgroups are not displayed properly in drop-down when editing a
      * group
@@ -45,12 +57,12 @@ class PagePickerIT
     {
         setup.loginAsSuperAdmin();
         String pageName = reference.getLastSpaceReference().getName();
-        setup.createPage(reference,
-            "{{velocity}}{{html}}#pagePicker({'id': 'pagePickerTest', 'multiple': true}){{/html}}{{/velocity}}",
+        setup.createPage(reference, String.format(
+                "{{velocity}}{{html}}#pagePicker({'id': '%s', 'multiple': true}){{/html}}{{/velocity}}", PICKER_ID),
             pageName);
 
         SuggestInputElement pagePicker =
-            new SuggestInputElement(setup.getDriver().findElementWithoutWaiting(By.id("pagePickerTest")));
+            new SuggestInputElement(setup.getDriver().findElementWithoutWaiting(By.id(PICKER_ID)));
 
         // Make sure the picker is ready. TODO: remove once XWIKI-19056 is closed.
         pagePicker.click().waitForSuggestions();
@@ -58,5 +70,34 @@ class PagePickerIT
         pagePicker.sendKeys(pageName.substring(0, 3)).waitForSuggestions().selectByVisibleText(pageName);
         pagePicker.clearSelectedSuggestions().sendKeys(pageName.substring(0, 3)).waitForSuggestions()
             .selectByVisibleText(pageName);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "ähm", "töst", "école", "hôtelière" })
+    @Order(3)
+    void searchCaseInsensitiveUnicode(String searchText, TestUtils setup, TestReference reference)
+        throws Exception
+    {
+        String pageName = reference.getLastSpaceReference().getName();
+
+        String title = "École hôtelière";
+        // Use setup.createPage() as the REST helper/REST API doesn't seem to support UTF-8.
+        setup.createPage(new DocumentReference("ÄhmTöst", reference.getLastSpaceReference()), "Content",
+            title);
+
+        setup.rest().delete(reference);
+        setup.createPage(reference, String.format(PICKER_TEMPLATE, PICKER_ID), pageName);
+
+        SuggestInputElement pagePicker =
+            new SuggestInputElement(setup.getDriver().findElementWithoutWaiting(By.id(PICKER_ID)));
+
+        // Make sure the picker is ready. TODO: remove once XWIKI-19056 is closed.
+        pagePicker.click().waitForSuggestions();
+
+        List<SuggestInputElement.SuggestionElement> suggestions =
+            pagePicker.sendKeys(searchText).waitForSuggestions().getSuggestions();
+        assertEquals(1, suggestions.size(),
+            String.format("Didn't find anything searching for %s", searchText));
+        assertEquals(title, suggestions.get(0).getLabel());
     }
 }
