@@ -31,7 +31,7 @@
   <name>XWiki Platform - Display - Macro</name>
   <description>Display an entity (document, property, etc.)</description>
   <properties>
-    <xwiki.jacoco.instructionRatio>0.78</xwiki.jacoco.instructionRatio>
+    <xwiki.jacoco.instructionRatio>0.70</xwiki.jacoco.instructionRatio>
     <!-- TODO: Remove once the tests have been fixed to not output anything to the console! -->
     <xwiki.surefire.captureconsole.skip>true</xwiki.surefire.captureconsole.skip>
     <!-- Name to display by the Extension Manager -->

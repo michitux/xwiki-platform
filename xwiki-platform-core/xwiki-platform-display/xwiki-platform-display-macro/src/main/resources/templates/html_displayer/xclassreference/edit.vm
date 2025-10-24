@@ -1,0 +1,163 @@
+## ---------------------------------------------------------------------------
+## See the NOTICE file distributed with this work for additional
+## information regarding copyright ownership.
+##
+## This is free software; you can redistribute it and/or modify it
+## under the terms of the GNU Lesser General Public License as
+## published by the Free Software Foundation; either version 2.1 of
+## the License, or (at your option) any later version.
+##
+## This software is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+## Lesser General Public License for more details.
+##
+## You should have received a copy of the GNU Lesser General Public
+## License along with this software; if not, write to the Free
+## Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+## 02110-1301 USA, or see the FSF site: http://www.fsf.org.
+## ---------------------------------------------------------------------------
+<script>
+    require(['jquery', 'xwiki-meta', 'xwiki-selectize'], function ($, xm) {
+        // Use promises to cache the results so that subsequent calls don't hit the server again.
+        const restUrl = xm.restURL.replace(/(\/wikis\/[^\/]+\/)spaces\/.*$/, '$1classes');
+        const classesData = $.getJSON(restUrl);
+
+        // Initialize the classes cache promise
+        const classesPromise = classesData
+                .then(function (data) {
+                    // Convert the REST API response format to selectize format
+                    return data.clazzs.map(function(item) {
+                        return {
+                            label: item.name,
+                            value: item.id,
+                            url: new XWiki.Document(XWiki.Model.resolve(item.id, XWiki.EntityType.DOCUMENT))
+                                    .getURL(),
+                            icon: {
+                                iconSetName: 'FontAwesome',
+                                iconSetType: 'FONT',
+                                cssClass: 'fa fa-cube'
+                            },
+                            hint: item.id
+                        };
+                    });
+                });
+
+        // Initialize the properties cache promise
+        const propertiesPromise = classesData
+                .then(function (data) {
+                    const propertiesCache = {};
+                    data.clazzs.forEach(function(item) {
+                        propertiesCache[item.id] = item.properties.map(function (prop) {
+                            return {
+                                label: prop.attributes.find(attr => attr.name === 'prettyName').value,
+                                value: prop.name,
+                                url: new XWiki.Document(XWiki.Model.resolve(item.id, XWiki.EntityType.DOCUMENT))
+                                        .getURL(),
+                                hint: prop.name
+                                // TODO: derive an icon based on the property type
+                            };
+                        });
+                    });
+                    return propertiesCache;
+                });
+
+        const settings = {
+            load: function(typedText, callback) {
+                classesPromise.then(callback).catch(function() {
+                    callback([]);
+                });
+            },
+            loadSelected: function(selectedValue, callback) {
+                classesPromise.then(function(classes) {
+                    // Find exact match for selected value
+                    const selected = classes.filter(function(item) {
+                        return item.value === selectedValue;
+                    });
+                    callback(selected);
+                }).catch(function() {
+                    callback([]);
+                });
+            }
+        };
+
+        const xClassSelect = $('.suggest-xclass-reference').xwikiSelectize(settings);
+
+        function createPropertySettings(select)
+        {
+            return {
+                load: function (typedText, callback) {
+                    const selectedClass = select.selectize.getValue();
+                    if (!selectedClass) {
+                        // No class selected, return empty list
+                        return callback([]);
+                    }
+                    propertiesPromise.then(function (propertiesCache) {
+                        callback(propertiesCache[selectedClass] || []);
+                    }).catch(function () {
+                        callback([]);
+                    });
+                },
+                loadSelected: function (selectedValue, callback) {
+                    const selectedClass = select.selectize.getValue();
+                    if (!selectedClass) {
+                        // No class selected, return empty list
+                        return callback([]);
+                    }
+                    propertiesPromise.then(function (propertiesCache) {
+                        const properties = propertiesCache[selectedClass] || [];
+                        // Find exact match for selected value
+                        const selected = properties.filter(function (item) {
+                            return item.value === selectedValue;
+                        });
+                        callback(selected);
+                    }).catch(function () {
+                        callback([]);
+                    });
+                }
+            };
+        }
+
+        for (const select of xClassSelect) {
+            // If we are in a group, find the associated property input and link them.
+            const group = select.dataset?.propertyGroup;
+
+            if (group) {
+                // Iterate over ancestors and check if they contain a property input with the same group
+                let parent = select.parentElement;
+                while (parent) {
+                    const propertyInput = parent.querySelector(
+                            `.suggest-xclass-property-name[data-property-group='${group}']`);
+                    if (propertyInput) {
+                        const propertySettings = createPropertySettings(select);
+
+                        $(propertyInput).xwikiSelectize(propertySettings);
+
+                        // When the class changes, clear the property selection
+                        select.selectize.on('change', function () {
+                            // Clear the property selection when the class changes
+                            const propertySelectize = propertyInput.selectize;
+                            propertySelectize.clearOptions(false);
+                            // Pre-load options for the current (new) class
+                            propertySelectize.load(function (callback) {
+                                propertySettings.load('', callback);
+                            });
+                        });
+
+                        break;
+                    }
+                    parent = parent.parentElement;
+                }
+            }
+        }
+    });
+</script>
+
+#set ($discard = $xwiki.linkx.use($services.webjars.url('selectize.js', 'css/selectize.bootstrap3.css'),
+{'type': 'text/css', 'rel': 'stylesheet'}))
+#set ($discard = $xwiki.ssfx.use('uicomponents/suggest/xwiki.selectize.css', true))
+#set ($discard = $displayer.parameters.putAll({
+    'class': "$!displayer.parameters.get('class') suggest-xclass-reference",
+    'data-xwiki-selectize': '{"maxItems": 1}'
+}))
+#template('html_displayer/default.vm')
