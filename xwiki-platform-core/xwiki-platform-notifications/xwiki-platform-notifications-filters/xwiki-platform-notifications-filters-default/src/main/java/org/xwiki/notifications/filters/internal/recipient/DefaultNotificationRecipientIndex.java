@@ -256,7 +256,8 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
                 case PAGE -> pageIndex;
                 case SPACE -> spaceIndex;
                 case WIKI -> wikiIndex;
-                case FOLLOWED_USER -> throw new IllegalStateException("Unsupported location index type.");
+                case FOLLOWED_USER ->
+                    throw new IllegalStateException(String.format("Unsupported location index type [%s].", this.type));
             };
         }
 
