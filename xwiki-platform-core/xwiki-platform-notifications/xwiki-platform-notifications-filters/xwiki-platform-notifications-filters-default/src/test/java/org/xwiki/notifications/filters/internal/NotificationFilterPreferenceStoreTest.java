@@ -20,6 +20,7 @@
 package org.xwiki.notifications.filters.internal;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import javax.inject.Provider;
@@ -35,6 +36,7 @@ import org.xwiki.model.reference.EntityReferenceSerializer;
 import org.xwiki.model.reference.WikiReference;
 import org.xwiki.notifications.NotificationException;
 import org.xwiki.notifications.filters.internal.event.NotificationFilterPreferenceDeletedEvent;
+import org.xwiki.notifications.filters.internal.recipient.IndexableNotificationFilterPreference;
 import org.xwiki.observation.ObservationManager;
 import org.xwiki.query.Query;
 import org.xwiki.query.QueryException;
@@ -51,6 +53,8 @@ import com.xpn.xwiki.store.XWikiHibernateBaseStore.HibernateCallback;
 import com.xpn.xwiki.store.XWikiHibernateStore;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -303,5 +307,64 @@ class NotificationFilterPreferenceStoreTest
         verify(this.context).setWikiReference(new WikiReference("subwiki"));
         verify(this.context).setWikiReference(CURRENT_WIKI_REFERENCE);
         verify(xwikiQuery).bindValue("owner", serializedRef);
+    }
+
+    @Test
+    void loadIndexablePreferencesBatch() throws Exception
+    {
+        DefaultNotificationFilterPreference preference = new DefaultNotificationFilterPreference();
+        Query xwikiQuery = mock(Query.class);
+        when(this.queryManager.createQuery(
+            "select nfp from DefaultNotificationFilterPreference nfp "
+                + "where nfp.internalId > :id order by nfp.internalId",
+            Query.HQL)).thenReturn(xwikiQuery);
+        when(xwikiQuery.bindValue("id", 12L)).thenReturn(xwikiQuery);
+        when(xwikiQuery.setLimit(10)).thenReturn(xwikiQuery);
+        when(xwikiQuery.execute()).thenReturn(List.of(preference));
+
+        List<IndexableNotificationFilterPreference> preferences =
+            this.notificationFilterPreferenceStore.loadIndexablePreferencesBatch("xwiki", 12L, 10);
+
+        assertEquals(List.of(preference), preferences);
+        verify(this.context).setWikiReference(new WikiReference("xwiki"));
+        verify(this.context).setWikiReference(CURRENT_WIKI_REFERENCE);
+    }
+
+    @Test
+    void loadIndexablePreferencesForOwner() throws Exception
+    {
+        DefaultNotificationFilterPreference preference = new DefaultNotificationFilterPreference();
+        Query xwikiQuery = mock(Query.class);
+        when(this.queryManager.createQuery("select nfp from DefaultNotificationFilterPreference nfp "
+            + "where nfp.owner = :owner order by nfp.id", Query.HQL)).thenReturn(xwikiQuery);
+        when(xwikiQuery.bindValue("owner", "xwiki:XWiki.User")).thenReturn(xwikiQuery);
+        when(xwikiQuery.execute()).thenReturn(List.of(preference));
+
+        List<IndexableNotificationFilterPreference> preferences =
+            this.notificationFilterPreferenceStore.loadIndexablePreferencesForOwner("xwiki:XWiki.User");
+
+        assertEquals(List.of(preference), preferences);
+        verify(this.context).setWikiReference(new WikiReference("xwiki"));
+        verify(this.context).setWikiReference(CURRENT_WIKI_REFERENCE);
+    }
+
+    @Test
+    void loadIndexablePreferenceById() throws Exception
+    {
+        DefaultNotificationFilterPreference preference = new DefaultNotificationFilterPreference();
+        Query xwikiQuery = mock(Query.class);
+        when(this.queryManager.createQuery("select nfp from DefaultNotificationFilterPreference nfp where nfp.id = :id",
+            Query.HQL)).thenReturn(xwikiQuery);
+        when(xwikiQuery.setLimit(1)).thenReturn(xwikiQuery);
+        when(xwikiQuery.bindValue("id", "NFP_42")).thenReturn(xwikiQuery);
+        when(xwikiQuery.execute()).thenReturn(List.of(preference));
+
+        Optional<IndexableNotificationFilterPreference> loadedPreference =
+            this.notificationFilterPreferenceStore.loadIndexablePreferenceById("xwiki", "NFP_42");
+
+        assertTrue(loadedPreference.isPresent());
+        assertInstanceOf(DefaultNotificationFilterPreference.class, loadedPreference.get());
+        verify(this.context).setWikiReference(new WikiReference("xwiki"));
+        verify(this.context).setWikiReference(CURRENT_WIKI_REFERENCE);
     }
 }

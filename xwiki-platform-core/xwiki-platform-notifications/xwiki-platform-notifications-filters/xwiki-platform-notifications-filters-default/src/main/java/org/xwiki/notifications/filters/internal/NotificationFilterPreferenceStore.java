@@ -31,6 +31,7 @@ import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Singleton;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Strings;
 import org.xwiki.component.annotation.Component;
 import org.xwiki.model.EntityType;
@@ -42,6 +43,8 @@ import org.xwiki.notifications.NotificationException;
 import org.xwiki.notifications.filters.NotificationFilterPreference;
 import org.xwiki.notifications.filters.internal.event.NotificationFilterPreferenceAddOrUpdatedEvent;
 import org.xwiki.notifications.filters.internal.event.NotificationFilterPreferenceDeletedEvent;
+import org.xwiki.notifications.filters.internal.recipient.IndexableNotificationFilterPreference;
+import org.xwiki.notifications.filters.internal.recipient.NotificationFilterPreferenceIndexStore;
 import org.xwiki.observation.ObservationManager;
 import org.xwiki.query.Query;
 import org.xwiki.query.QueryException;
@@ -60,10 +63,10 @@ import com.xpn.xwiki.store.XWikiHibernateStore;
  * @since 10.8RC1
  * @since 9.11.8
  */
-@Component(roles = NotificationFilterPreferenceStore.class)
+@Component(roles = { NotificationFilterPreferenceStore.class, NotificationFilterPreferenceIndexStore.class })
 @Singleton
 @SuppressWarnings("checkstyle:ClassFanOutComplexity")
-public class NotificationFilterPreferenceStore
+public class NotificationFilterPreferenceStore implements NotificationFilterPreferenceIndexStore
 {
     private static final String ID = "id";
 
@@ -227,6 +230,50 @@ public class NotificationFilterPreferenceStore
         });
     }
 
+    @Override
+    public List<IndexableNotificationFilterPreference> loadIndexablePreferencesBatch(String wikiId,
+        long afterInternalId, int limit) throws NotificationException
+    {
+        return new ArrayList<>(configureContextWrapper(new WikiReference(wikiId), () -> {
+            try {
+                return this.queryManager.createQuery(
+                    "select nfp from DefaultNotificationFilterPreference nfp where nfp.internalId > :id "
+                        + "order by nfp.internalId",
+                    Query.HQL)
+                    .bindValue(ID, afterInternalId)
+                    .setLimit(limit)
+                    .execute();
+            } catch (QueryException e) {
+                throw new NotificationException(String.format(
+                    "Error while loading the indexable notification filter preferences on wiki [%s].", wikiId), e);
+            }
+        }));
+    }
+
+    @Override
+    public List<IndexableNotificationFilterPreference> loadIndexablePreferencesForOwner(String owner)
+        throws NotificationException
+    {
+        String wikiId = Strings.CS.contains(owner, ':') ? StringUtils.substringBefore(owner, ":") : owner;
+        return new ArrayList<>(configureContextWrapper(new WikiReference(wikiId), () -> {
+            try {
+                return new ArrayList<>(getPreferencesOfEntityReference(owner));
+            } catch (QueryException e) {
+                throw new NotificationException(
+                    String.format("Error while loading the notification filter preferences of the owner [%s].", owner),
+                    e);
+            }
+        }));
+    }
+
+    @Override
+    public Optional<IndexableNotificationFilterPreference> loadIndexablePreferenceById(String wikiId,
+        String preferenceId) throws NotificationException
+    {
+        return getFilterPreference(preferenceId, new WikiReference(wikiId))
+            .map(preference -> (IndexableNotificationFilterPreference) preference);
+    }
+
     private List<DefaultNotificationFilterPreference> getPreferencesOfEntity(EntityReference entityReference)
         throws QueryException
     {
@@ -236,14 +283,19 @@ public class NotificationFilterPreferenceStore
         WikiReference wikiReference = (WikiReference) entityReference.extractReference(EntityType.WIKI);
         return configureContextWrapper(wikiReference, () -> {
             String serializedEntity = this.entityReferenceSerializer.serialize(entityReference);
-
-            Query query = this.queryManager.createQuery(
-                "select nfp from DefaultNotificationFilterPreference nfp where nfp.owner = :owner order by nfp.id",
-                Query.HQL);
-            query.bindValue("owner", serializedEntity);
-
-            return query.execute();
+            return getPreferencesOfEntityReference(serializedEntity);
         });
+    }
+
+    private List<DefaultNotificationFilterPreference> getPreferencesOfEntityReference(String serializedEntity)
+        throws QueryException
+    {
+        Query query = this.queryManager.createQuery(
+            "select nfp from DefaultNotificationFilterPreference nfp where nfp.owner = :owner order by nfp.id",
+            Query.HQL);
+        query.bindValue("owner", serializedEntity);
+
+        return query.execute();
     }
 
     /**

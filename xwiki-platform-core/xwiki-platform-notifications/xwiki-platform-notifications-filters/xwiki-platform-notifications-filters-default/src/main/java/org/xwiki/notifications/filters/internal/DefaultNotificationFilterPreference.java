@@ -28,6 +28,7 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.xwiki.notifications.NotificationFormat;
 import org.xwiki.notifications.filters.NotificationFilterPreference;
 import org.xwiki.notifications.filters.NotificationFilterType;
+import org.xwiki.notifications.filters.internal.recipient.IndexableNotificationFilterPreference;
 import org.xwiki.text.StringUtils;
 
 /**
@@ -37,7 +38,7 @@ import org.xwiki.text.StringUtils;
  * @since 9.11.8
  * @version $Id $
  */
-public class DefaultNotificationFilterPreference implements NotificationFilterPreference
+public class DefaultNotificationFilterPreference implements IndexableNotificationFilterPreference
 {
     private static final String LIST_SEPARATOR = ",";
 
