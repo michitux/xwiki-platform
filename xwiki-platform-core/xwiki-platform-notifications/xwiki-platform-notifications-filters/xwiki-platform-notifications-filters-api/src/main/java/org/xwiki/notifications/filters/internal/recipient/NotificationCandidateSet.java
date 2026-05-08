@@ -74,7 +74,7 @@ public class NotificationCandidateSet
      */
     public Set<String> getCandidateUsers()
     {
-        LinkedHashSet<String> result = new LinkedHashSet<>(this.scopeCandidateUsers);
+        Set<String> result = new LinkedHashSet<>(this.scopeCandidateUsers);
         result.addAll(this.followedUserCandidateUsers);
         return result;
     }

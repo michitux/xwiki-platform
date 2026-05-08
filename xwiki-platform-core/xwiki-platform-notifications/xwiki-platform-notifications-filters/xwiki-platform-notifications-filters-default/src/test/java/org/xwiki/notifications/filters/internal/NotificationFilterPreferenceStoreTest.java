@@ -79,7 +79,7 @@ class NotificationFilterPreferenceStoreTest
     private static final WikiReference CURRENT_WIKI_REFERENCE = new WikiReference("current");
     private static final WikiReference MAIN_WIKI_REFERENCE = new WikiReference("main");
 
-    @InjectMockComponents
+    @InjectMockComponents(role = NotificationFilterPreferenceStore.class)
     private NotificationFilterPreferenceStore notificationFilterPreferenceStore;
 
     @MockComponent

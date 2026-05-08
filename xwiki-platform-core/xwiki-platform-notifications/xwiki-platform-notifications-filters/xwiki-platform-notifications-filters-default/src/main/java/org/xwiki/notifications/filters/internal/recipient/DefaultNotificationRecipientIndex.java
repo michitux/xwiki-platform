@@ -191,18 +191,7 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
             }
 
             if (ScopeNotificationFilter.FILTER_NAME.equals(preference.getFilterName())) {
-                if (StringUtils.isNotBlank(preference.getPageOnly())) {
-                    return new IndexedPreference(preference.getInternalId(), preference.getOwner(),
-                        IndexedPreferenceType.PAGE_ONLY, preference.getPageOnly(), getEventTypeKeys(preference));
-                }
-                if (StringUtils.isNotBlank(preference.getPage())) {
-                    return new IndexedPreference(preference.getInternalId(), preference.getOwner(),
-                        IndexedPreferenceType.PAGE, preference.getPage(), getEventTypeKeys(preference));
-                }
-                if (StringUtils.isNotBlank(preference.getWiki())) {
-                    return new IndexedPreference(preference.getInternalId(), preference.getOwner(),
-                        IndexedPreferenceType.WIKI, preference.getWiki(), getEventTypeKeys(preference));
-                }
+                return createScopePreference(preference);
             }
 
             if (EventUserFilter.FILTER_NAME.equals(preference.getFilterName())
@@ -212,6 +201,30 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
             }
 
             return null;
+        }
+
+        private static IndexedPreference createScopePreference(IndexableNotificationFilterPreference preference)
+        {
+            IndexedPreferenceType indexedPreferenceType = null;
+            String key = null;
+
+            if (StringUtils.isNotBlank(preference.getPageOnly())) {
+                indexedPreferenceType = IndexedPreferenceType.PAGE_ONLY;
+                key = preference.getPageOnly();
+            } else if (StringUtils.isNotBlank(preference.getPage())) {
+                indexedPreferenceType = IndexedPreferenceType.PAGE;
+                key = preference.getPage();
+            } else if (StringUtils.isNotBlank(preference.getWiki())) {
+                indexedPreferenceType = IndexedPreferenceType.WIKI;
+                key = preference.getWiki();
+            }
+
+            if (indexedPreferenceType == null) {
+                return null;
+            }
+
+            return new IndexedPreference(preference.getInternalId(), preference.getOwner(), indexedPreferenceType, key,
+                getEventTypeKeys(preference));
         }
 
         private long getInternalId()

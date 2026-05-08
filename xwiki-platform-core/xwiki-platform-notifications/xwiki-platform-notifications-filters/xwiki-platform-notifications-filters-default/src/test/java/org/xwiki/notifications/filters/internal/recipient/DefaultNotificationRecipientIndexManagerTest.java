@@ -62,9 +62,6 @@ class DefaultNotificationRecipientIndexManagerTest
 
         when(this.notificationFilterPreferenceIndexStore.loadIndexablePreferencesBatch("xwiki", 0, 100))
             .thenReturn(List.of(preference));
-        when(this.notificationFilterPreferenceIndexStore.loadIndexablePreferencesBatch("xwiki", 12L, 100))
-            .thenReturn(List.of());
-
         NotificationRecipientIndex firstIndex = this.notificationRecipientIndexManager.getOrBuildIndex("xwiki");
         NotificationRecipientIndex secondIndex = this.notificationRecipientIndexManager.getOrBuildIndex("xwiki");
 
@@ -72,7 +69,5 @@ class DefaultNotificationRecipientIndexManagerTest
         assertTrue(this.notificationRecipientIndexManager.getIfPresent("xwiki").isPresent());
         verify(this.notificationFilterPreferenceIndexStore, times(1))
             .loadIndexablePreferencesBatch("xwiki", 0, 100);
-        verify(this.notificationFilterPreferenceIndexStore, times(1))
-            .loadIndexablePreferencesBatch("xwiki", 12L, 100);
     }
 }

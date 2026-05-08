@@ -68,6 +68,8 @@ import com.xpn.xwiki.store.XWikiHibernateStore;
 @SuppressWarnings("checkstyle:ClassFanOutComplexity")
 public class NotificationFilterPreferenceStore implements NotificationFilterPreferenceIndexStore
 {
+    private static final String WIKI_SEPARATOR = ":";
+
     private static final String ID = "id";
 
     @Inject
@@ -254,7 +256,8 @@ public class NotificationFilterPreferenceStore implements NotificationFilterPref
     public List<IndexableNotificationFilterPreference> loadIndexablePreferencesForOwner(String owner)
         throws NotificationException
     {
-        String wikiId = Strings.CS.contains(owner, ":") ? StringUtils.substringBefore(owner, ":") : owner;
+        String wikiId = Strings.CS.contains(owner, WIKI_SEPARATOR)
+            ? StringUtils.substringBefore(owner, WIKI_SEPARATOR) : owner;
         return new ArrayList<>(configureContextWrapper(new WikiReference(wikiId), () -> {
             try {
                 return new ArrayList<>(getPreferencesOfEntityReference(owner));
