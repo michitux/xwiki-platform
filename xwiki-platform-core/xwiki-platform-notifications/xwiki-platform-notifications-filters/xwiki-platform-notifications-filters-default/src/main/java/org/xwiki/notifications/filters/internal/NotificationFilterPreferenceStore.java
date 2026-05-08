@@ -254,7 +254,7 @@ public class NotificationFilterPreferenceStore implements NotificationFilterPref
     public List<IndexableNotificationFilterPreference> loadIndexablePreferencesForOwner(String owner)
         throws NotificationException
     {
-        String wikiId = Strings.CS.contains(owner, ':') ? StringUtils.substringBefore(owner, ":") : owner;
+        String wikiId = Strings.CS.contains(owner, ":") ? StringUtils.substringBefore(owner, ":") : owner;
         return new ArrayList<>(configureContextWrapper(new WikiReference(wikiId), () -> {
             try {
                 return new ArrayList<>(getPreferencesOfEntityReference(owner));
