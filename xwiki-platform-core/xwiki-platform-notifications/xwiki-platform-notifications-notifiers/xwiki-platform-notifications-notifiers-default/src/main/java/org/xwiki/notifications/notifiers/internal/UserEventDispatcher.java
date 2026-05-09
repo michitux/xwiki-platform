@@ -239,8 +239,6 @@ public class UserEventDispatcher
 
     private CompletableFuture<?> dispatchInContext(Event event)
     {
-        WikiReference eventWiki = event.getWiki();
-
         if (CollectionUtils.isNotEmpty(event.getTarget())) {
             // The event explicitly indicate with which entities the event is associated with
 
