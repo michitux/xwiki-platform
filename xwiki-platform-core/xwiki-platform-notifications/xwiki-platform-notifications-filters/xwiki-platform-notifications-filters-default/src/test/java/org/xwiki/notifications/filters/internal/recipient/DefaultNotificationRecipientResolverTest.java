@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.xwiki.test.junit5.mockito.ComponentTest;
 import org.xwiki.test.junit5.mockito.InjectMockComponents;
 import org.xwiki.test.junit5.mockito.MockComponent;
+import org.xwiki.wiki.descriptor.WikiDescriptorManager;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
@@ -45,6 +46,9 @@ class DefaultNotificationRecipientResolverTest
     @MockComponent
     private NotificationRecipientIndexManager notificationRecipientIndexManager;
 
+    @MockComponent
+    private WikiDescriptorManager wikiDescriptorManager;
+
     @Test
     void resolveCandidateUsersDelegatesToIndexManager() throws Exception
     {
@@ -54,10 +58,33 @@ class DefaultNotificationRecipientResolverTest
         notificationCandidateSet.addFollowedUserCandidateUser("xwiki:XWiki.OtherUser");
         NotificationEventDescriptor eventDescriptor = NotificationEventDescriptor.builder().wikiId("xwiki").build();
 
+        when(this.wikiDescriptorManager.getMainWikiId()).thenReturn("xwiki");
         when(this.notificationRecipientIndexManager.getOrBuildIndex("xwiki")).thenReturn(notificationRecipientIndex);
         when(notificationRecipientIndex.findCandidates(eventDescriptor)).thenReturn(notificationCandidateSet);
 
         assertEquals(Set.of("xwiki:XWiki.User", "xwiki:XWiki.OtherUser"),
+            this.notificationRecipientResolver.resolveCandidateUsers(eventDescriptor));
+    }
+
+    @Test
+    void resolveCandidateUsersIncludesMainWikiIndexForSubwikiEvents() throws Exception
+    {
+        NotificationRecipientIndex subwikiNotificationRecipientIndex = mock(NotificationRecipientIndex.class, "subwiki");
+        NotificationRecipientIndex mainWikiNotificationRecipientIndex = mock(NotificationRecipientIndex.class, "main");
+        NotificationCandidateSet subwikiCandidates = new NotificationCandidateSet();
+        NotificationCandidateSet mainWikiCandidates = new NotificationCandidateSet();
+        NotificationEventDescriptor eventDescriptor = NotificationEventDescriptor.builder().wikiId("subwiki").build();
+
+        subwikiCandidates.addScopeCandidateUser("subwiki:XWiki.SubUser");
+        mainWikiCandidates.addFollowedUserCandidateUser("xwiki:XWiki.MainUser");
+
+        when(this.wikiDescriptorManager.getMainWikiId()).thenReturn("xwiki");
+        when(this.notificationRecipientIndexManager.getOrBuildIndex("subwiki")).thenReturn(subwikiNotificationRecipientIndex);
+        when(this.notificationRecipientIndexManager.getOrBuildIndex("xwiki")).thenReturn(mainWikiNotificationRecipientIndex);
+        when(subwikiNotificationRecipientIndex.findCandidates(eventDescriptor)).thenReturn(subwikiCandidates);
+        when(mainWikiNotificationRecipientIndex.findCandidates(eventDescriptor)).thenReturn(mainWikiCandidates);
+
+        assertEquals(Set.of("subwiki:XWiki.SubUser", "xwiki:XWiki.MainUser"),
             this.notificationRecipientResolver.resolveCandidateUsers(eventDescriptor));
     }
 }

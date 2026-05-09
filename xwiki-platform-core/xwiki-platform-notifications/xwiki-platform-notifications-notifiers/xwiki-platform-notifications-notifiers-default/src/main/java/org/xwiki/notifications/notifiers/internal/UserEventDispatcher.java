@@ -47,12 +47,17 @@ import org.xwiki.eventstream.internal.DefaultEntityEvent;
 import org.xwiki.eventstream.internal.DefaultEventStatus;
 import org.xwiki.eventstream.query.SimpleEventQuery;
 import org.xwiki.eventstream.query.SortableEventQuery.SortClause.Order;
+import org.xwiki.model.EntityReference;
+import org.xwiki.model.EntityType;
 import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.model.reference.DocumentReferenceResolver;
 import org.xwiki.model.reference.EntityReferenceSerializer;
 import org.xwiki.model.reference.WikiReference;
 import org.xwiki.notifications.NotificationConfiguration;
+import org.xwiki.notifications.NotificationException;
 import org.xwiki.notifications.NotificationFormat;
+import org.xwiki.notifications.filters.internal.recipient.NotificationEventDescriptor;
+import org.xwiki.notifications.filters.internal.recipient.NotificationRecipientResolver;
 import org.xwiki.notifications.filters.internal.DeletedDocumentCleanUpFilterProcessingQueue;
 import org.xwiki.observation.remote.RemoteObservationManagerConfiguration;
 import org.xwiki.user.UserException;
@@ -119,6 +124,9 @@ public class UserEventDispatcher
 
     @Inject
     private DeletedDocumentCleanUpFilterProcessingQueue cleanUpFilterProcessingQueue;
+
+    @Inject
+    private NotificationRecipientResolver notificationRecipientResolver;
 
     @Inject
     private Logger logger;
@@ -258,21 +266,72 @@ public class UserEventDispatcher
                 }
             }
         } else {
-            // Try to find users listening to this event
-
-            // Associated event with event's wiki users
-            dispatch(event, this.userCache.getUsers(eventWiki, true));
-
-            // Also take into account global users (main wiki users) if the event is on a subwiki
-            if (!this.wikiManager.isMainWiki(eventWiki.getName())) {
-                List<DocumentReference> userList =
-                    this.userCache.getUsers(new WikiReference(this.wikiManager.getMainWikiId()), true);
-                dispatch(event, userList);
-            }
+            dispatchCandidateUsers(event);
         }
 
         // Remember we are done pre-filtering this event
         return this.events.prefilterEvent(event);
+    }
+
+    private void dispatchCandidateUsers(Event event)
+    {
+        boolean mailEnabled = this.notificationConfiguration.areEmailsEnabled();
+
+        try {
+            NotificationEventDescriptor eventDescriptor = createEventDescriptor(event);
+            for (String serializedUser : this.notificationRecipientResolver.resolveCandidateUsers(eventDescriptor)) {
+                dispatch(event, this.resolver.resolve(serializedUser, event.getWiki()), mailEnabled);
+            }
+        } catch (NotificationException e) {
+            this.logger.warn(
+                "Failed to resolve candidate recipients for event [{}]. Falling back to full user scan. Cause: [{}]",
+                event.getId(), ExceptionUtils.getRootCauseMessage(e));
+            dispatchAllUsers(event);
+        }
+    }
+
+    private void dispatchAllUsers(Event event)
+    {
+        WikiReference eventWiki = event.getWiki();
+
+        dispatch(event, this.userCache.getUsers(eventWiki, true));
+
+        if (!this.wikiManager.isMainWiki(eventWiki.getName())) {
+            List<DocumentReference> userList =
+                this.userCache.getUsers(new WikiReference(this.wikiManager.getMainWikiId()), true);
+            dispatch(event, userList);
+        }
+    }
+
+    private NotificationEventDescriptor createEventDescriptor(Event event)
+    {
+        DocumentReference documentReference = event.getDocument();
+        NotificationEventDescriptor.Builder builder = NotificationEventDescriptor.builder()
+            .wikiId(event.getWiki().getName())
+            .eventType(event.getType())
+            .eventDate(event.getDate());
+
+        if (documentReference != null) {
+            builder.documentReference(this.entityReferenceSerializer.serialize(documentReference))
+                .spaceReferences(getSpaceReferences(documentReference));
+        }
+
+        if (event.getUser() != null) {
+            builder.actor(this.entityReferenceSerializer.serialize(event.getUser()));
+        }
+
+        return builder.build();
+    }
+
+    private List<String> getSpaceReferences(DocumentReference documentReference)
+    {
+        List<String> result = new ArrayList<>();
+        EntityReference current = documentReference.getParent();
+        while (current != null && current.getType() == EntityType.SPACE) {
+            result.add(this.entityReferenceSerializer.serialize(current));
+            current = current.getParent();
+        }
+        return result;
     }
 
     private void dispatch(Event event, DocumentReference user, boolean mailEnabled)

@@ -46,6 +46,7 @@ import org.xwiki.model.reference.EntityReferenceSerializer;
 import org.xwiki.model.reference.WikiReference;
 import org.xwiki.notifications.NotificationConfiguration;
 import org.xwiki.notifications.NotificationFormat;
+import org.xwiki.notifications.filters.internal.recipient.NotificationRecipientResolver;
 import org.xwiki.observation.remote.RemoteObservationManagerConfiguration;
 import org.xwiki.test.junit5.mockito.ComponentTest;
 import org.xwiki.test.junit5.mockito.InjectMockComponents;
@@ -97,6 +98,9 @@ class UserEventDispatcherTest
 
     @MockComponent
     private EntityReferenceSerializer<String> entityReferenceSerializer;
+
+    @MockComponent
+    private NotificationRecipientResolver notificationRecipientResolver;
 
     @MockComponent
     private GroupManager groupManager;
@@ -199,7 +203,6 @@ class UserEventDispatcherTest
 
         DocumentReference mainUserFoo = mock(DocumentReference.class, "mainUserFoo");
         DocumentReference mainUserBar = mock(DocumentReference.class, "mainUserBar");
-        when(this.userCache.getUsers(mainWiki, true)).thenReturn(List.of(mainUserFoo, mainUserBar));
 
         when(this.notificationConfiguration.areEmailsEnabled()).thenReturn(true);
 
@@ -207,6 +210,8 @@ class UserEventDispatcherTest
         String mainUserBarStr = "mainUserBar";
         when(this.entityReferenceSerializer.serialize(mainUserFoo)).thenReturn(mainUserFooStr);
         when(this.entityReferenceSerializer.serialize(mainUserBar)).thenReturn(mainUserBarStr);
+        when(this.notificationRecipientResolver.resolveCandidateUsers(any())).thenReturn(
+            Set.of(mainUserFooStr, mainUserBarStr), Set.of(mainUserFooStr, mainUserBarStr));
 
         SimpleEventQuery queryStatusE2R1 = new SimpleEventQuery(0, 0)
             .eq(Event.FIELD_ID, event2Result1Id)
@@ -360,6 +365,6 @@ class UserEventDispatcherTest
 
         verify(this.ecm, times(3)).pushContext(any(), eq(false));
         verify(this.ecm, times(3)).popContext();
-
+        verify(this.userCache, never()).getUsers(any(), eq(true));
     }
 }

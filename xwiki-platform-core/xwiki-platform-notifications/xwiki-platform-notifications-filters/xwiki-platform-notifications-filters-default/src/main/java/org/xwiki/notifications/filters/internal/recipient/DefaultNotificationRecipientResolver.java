@@ -19,6 +19,7 @@
  */
 package org.xwiki.notifications.filters.internal.recipient;
 
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 import javax.inject.Inject;
@@ -26,6 +27,7 @@ import javax.inject.Singleton;
 
 import org.xwiki.component.annotation.Component;
 import org.xwiki.notifications.NotificationException;
+import org.xwiki.wiki.descriptor.WikiDescriptorManager;
 
 /**
  * Default implementation of {@link NotificationRecipientResolver}.
@@ -40,12 +42,27 @@ public class DefaultNotificationRecipientResolver implements NotificationRecipie
     @Inject
     private NotificationRecipientIndexManager notificationRecipientIndexManager;
 
+    @Inject
+    private WikiDescriptorManager wikiDescriptorManager;
+
     @Override
     public Set<String> resolveCandidateUsers(NotificationEventDescriptor eventDescriptor) throws NotificationException
     {
+        Set<String> candidateUsers = new LinkedHashSet<>(findCandidates(eventDescriptor.getWikiId(), eventDescriptor));
+
+        String mainWikiId = this.wikiDescriptorManager.getMainWikiId();
+        if (!mainWikiId.equals(eventDescriptor.getWikiId())) {
+            candidateUsers.addAll(findCandidates(mainWikiId, eventDescriptor));
+        }
+
+        return candidateUsers;
+    }
+
+    private Set<String> findCandidates(String storeWikiId, NotificationEventDescriptor eventDescriptor)
+        throws NotificationException
+    {
         NotificationCandidateSet candidateSet =
-            this.notificationRecipientIndexManager.getOrBuildIndex(eventDescriptor.getWikiId())
-                .findCandidates(eventDescriptor);
+            this.notificationRecipientIndexManager.getOrBuildIndex(storeWikiId).findCandidates(eventDescriptor);
         return candidateSet.getCandidateUsers();
     }
 }
