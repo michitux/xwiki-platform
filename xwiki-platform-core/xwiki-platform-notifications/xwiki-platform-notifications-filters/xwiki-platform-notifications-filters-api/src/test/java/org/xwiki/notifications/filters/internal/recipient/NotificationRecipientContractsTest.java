@@ -28,7 +28,6 @@ import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.model.reference.WikiReference;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -87,6 +86,5 @@ class NotificationRecipientContractsTest
             notificationRecipientIndexManager.refreshUser(new DocumentReference("xwiki", "XWiki", "User")));
         assertDoesNotThrow(() -> notificationRecipientIndexManager.refreshWiki(new WikiReference("xwiki")));
         assertTrue(result.isEmpty());
-        assertEquals(Optional.empty(), result);
     }
 }
