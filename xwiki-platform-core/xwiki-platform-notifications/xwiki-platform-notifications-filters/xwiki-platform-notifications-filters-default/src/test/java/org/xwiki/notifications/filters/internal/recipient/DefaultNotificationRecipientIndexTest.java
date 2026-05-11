@@ -83,11 +83,11 @@ class DefaultNotificationRecipientIndexTest
         when(this.entityReferenceSerializer.serialize(pageReference.getLastSpaceReference())).thenReturn(SPACE_REFERENCE);
         when(this.entityReferenceSerializer.serialize(actorReference)).thenReturn(ACTOR_REFERENCE);
 
-        this.index.addOrUpdate(createScopePreference(1L, "xwiki:XWiki.PageWatcher", PAGE_REFERENCE, null, null,
+        this.index.addOrUpdate(createScopePreference("NFP_1", "xwiki:XWiki.PageWatcher", PAGE_REFERENCE, null, null,
             Set.of()));
-        this.index.addOrUpdate(createScopePreference(2L, "xwiki:XWiki.WikiWatcher", null, null, "xwiki",
+        this.index.addOrUpdate(createScopePreference("NFP_2", "xwiki:XWiki.WikiWatcher", null, null, "xwiki",
             Set.of("update")));
-        this.index.addOrUpdate(createFollowedUserPreference(3L, "xwiki:XWiki.ActorWatcher", ACTOR_REFERENCE));
+        this.index.addOrUpdate(createFollowedUserPreference("NFP_3", "xwiki:XWiki.ActorWatcher", ACTOR_REFERENCE));
 
         when(updateEvent.getWiki()).thenReturn(new WikiReference("xwiki"));
         when(updateEvent.getDocument()).thenReturn(pageReference);
@@ -118,9 +118,9 @@ class DefaultNotificationRecipientIndexTest
         when(this.entityReferenceSerializer.serialize(newPage)).thenReturn("xwiki:New.Page");
         when(this.entityReferenceSerializer.serialize(newPage.getLastSpaceReference())).thenReturn("xwiki:New");
 
-        this.index.addOrUpdate(createScopePreference(4L, "xwiki:XWiki.User", "xwiki:Old.Page", null, null,
+        this.index.addOrUpdate(createScopePreference("NFP_4", "xwiki:XWiki.User", "xwiki:Old.Page", null, null,
             Set.of()));
-        this.index.addOrUpdate(createScopePreference(4L, "xwiki:XWiki.User", "xwiki:New.Page", null, null,
+        this.index.addOrUpdate(createScopePreference("NFP_4", "xwiki:XWiki.User", "xwiki:New.Page", null, null,
             Set.of()));
 
         when(oldEvent.getWiki()).thenReturn(new WikiReference("xwiki"));
@@ -131,15 +131,15 @@ class DefaultNotificationRecipientIndexTest
         assertTrue(this.index.findCandidates(oldEvent).isEmpty());
         assertEquals(Set.of(owner), this.index.findCandidates(newEvent));
 
-        this.index.remove(createScopePreference(4L, "xwiki:XWiki.User", "xwiki:New.Page", null, null, Set.of()));
+        this.index.remove("NFP_4");
         assertTrue(this.index.findCandidates(newEvent).isEmpty());
     }
 
-    private DefaultNotificationFilterPreference createScopePreference(long internalId, String owner, String pageOnly,
+    private DefaultNotificationFilterPreference createScopePreference(String preferenceId, String owner, String pageOnly,
         String page, String wiki, Set<String> eventTypes)
     {
         DefaultNotificationFilterPreference preference = new DefaultNotificationFilterPreference();
-        preference.setInternalId(internalId);
+        preference.setId(preferenceId);
         preference.setOwner(owner);
         preference.setEnabled(true);
         preference.setFilterName("scopeNotificationFilter");
@@ -152,10 +152,11 @@ class DefaultNotificationRecipientIndexTest
         return preference;
     }
 
-    private DefaultNotificationFilterPreference createFollowedUserPreference(long internalId, String owner, String user)
+    private DefaultNotificationFilterPreference createFollowedUserPreference(String preferenceId, String owner,
+        String user)
     {
         DefaultNotificationFilterPreference preference = new DefaultNotificationFilterPreference();
-        preference.setInternalId(internalId);
+        preference.setId(preferenceId);
         preference.setOwner(owner);
         preference.setEnabled(true);
         preference.setFilterName("eventUserNotificationFilter");

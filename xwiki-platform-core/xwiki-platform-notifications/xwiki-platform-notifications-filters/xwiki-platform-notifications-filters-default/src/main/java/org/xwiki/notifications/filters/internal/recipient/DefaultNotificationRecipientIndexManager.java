@@ -19,8 +19,8 @@
  */
 package org.xwiki.notifications.filters.internal.recipient;
 
+import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -28,11 +28,10 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 import org.xwiki.component.annotation.Component;
-import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.model.reference.DocumentReferenceResolver;
 import org.xwiki.model.reference.EntityReferenceSerializer;
-import org.xwiki.model.reference.WikiReference;
 import org.xwiki.notifications.NotificationException;
+import org.xwiki.notifications.filters.internal.DefaultNotificationFilterPreference;
 import org.xwiki.notifications.filters.internal.NotificationFilterPreferenceStore;
 
 /**
@@ -78,44 +77,19 @@ public class DefaultNotificationRecipientIndexManager implements NotificationRec
         }
     }
 
-    @Override
-    public Optional<NotificationRecipientIndex> getIfPresent(String wikiId)
-    {
-        return Optional.ofNullable(this.indexes.get(wikiId));
-    }
-
-    @Override
-    public void refreshUser(DocumentReference user) throws NotificationException
-    {
-        refreshOwner(user.getWikiReference().getName(), this.entityReferenceSerializer.serialize(user),
-            this.notificationFilterPreferenceStore.getPreferencesOfUser(user));
-    }
-
-    @Override
-    public void refreshWiki(WikiReference wikiReference) throws NotificationException
-    {
-        refreshOwner(wikiReference.getName(), this.entityReferenceSerializer.serialize(wikiReference),
-            this.notificationFilterPreferenceStore.getPreferencesOfWiki(wikiReference));
-    }
-
-    @Override
-    public void invalidateWiki(String wikiId)
-    {
-        this.indexes.remove(wikiId);
-    }
-
-    @Override
-    public void clear()
-    {
-        this.indexes.clear();
-    }
-
-    private void refreshOwner(String wikiId, String owner,
-        List<? extends IndexableNotificationFilterPreference> preferences)
+    void addOrUpdatePreference(String wikiId, IndexableNotificationFilterPreference preference)
     {
         DefaultNotificationRecipientIndex index = this.indexes.get(wikiId);
         if (index != null) {
-            index.replaceOwner(owner, preferences);
+            index.addOrUpdate(preference);
+        }
+    }
+
+    void removePreferences(String wikiId, Collection<String> preferenceIds)
+    {
+        DefaultNotificationRecipientIndex index = this.indexes.get(wikiId);
+        if (index != null) {
+            preferenceIds.forEach(index::remove);
         }
     }
 
@@ -126,7 +100,7 @@ public class DefaultNotificationRecipientIndexManager implements NotificationRec
 
         long afterInternalId = 0;
         while (true) {
-            List<IndexableNotificationFilterPreference> batch =
+            List<DefaultNotificationFilterPreference> batch =
                 this.notificationFilterPreferenceStore.loadIndexablePreferencesBatch(wikiId, afterInternalId,
                     BATCH_SIZE);
             if (batch.isEmpty()) {
@@ -135,7 +109,7 @@ public class DefaultNotificationRecipientIndexManager implements NotificationRec
 
             batch.forEach(index::addOrUpdate);
 
-            long nextAfterInternalId = batch.stream().mapToLong(IndexableNotificationFilterPreference::getInternalId)
+            long nextAfterInternalId = batch.stream().mapToLong(DefaultNotificationFilterPreference::getInternalId)
                 .max().orElse(afterInternalId);
             if (nextAfterInternalId <= afterInternalId || batch.size() < BATCH_SIZE) {
                 break;

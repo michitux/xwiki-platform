@@ -33,20 +33,6 @@ import org.xwiki.model.reference.DocumentReference;
 public interface NotificationRecipientIndex
 {
     /**
-     * Add or update an indexable preference.
-     *
-     * @param preference the preference to index
-     */
-    void addOrUpdate(IndexableNotificationFilterPreference preference);
-
-    /**
-     * Remove an indexed preference.
-     *
-     * @param preference the preference to remove
-     */
-    void remove(IndexableNotificationFilterPreference preference);
-
-    /**
      * Find candidate owners for an event.
      *
      * @param event the event to analyze

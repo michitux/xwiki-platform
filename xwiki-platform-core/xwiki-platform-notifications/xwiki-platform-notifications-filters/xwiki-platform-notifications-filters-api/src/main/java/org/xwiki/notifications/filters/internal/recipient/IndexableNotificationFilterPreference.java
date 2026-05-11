@@ -30,11 +30,6 @@ import org.xwiki.notifications.filters.NotificationFilterPreference;
 public interface IndexableNotificationFilterPreference extends NotificationFilterPreference
 {
     /**
-     * @return the internal database identifier of the preference
-     */
-    long getInternalId();
-
-    /**
      * @return the serialized owner reference of the preference
      */
     String getOwner();

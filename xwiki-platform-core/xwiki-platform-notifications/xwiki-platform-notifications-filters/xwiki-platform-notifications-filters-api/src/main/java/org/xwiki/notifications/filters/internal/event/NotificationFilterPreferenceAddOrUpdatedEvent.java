@@ -21,6 +21,11 @@ package org.xwiki.notifications.filters.internal.event;
 
 /**
  * Event generated when a notification filter preference is add or updated.
+ * The event is sent with the following information:
+ * <ul>
+ *     <li>source: the saved preference</li>
+ *     <li>data: either a DocumentReference representing the user owner, or a WikiReference for a wiki owner</li>
+ * </ul>
  * 
  * @version $Id$
  * @since 10.11.4

@@ -30,7 +30,7 @@ import org.xwiki.test.junit5.mockito.ComponentTest;
 import org.xwiki.test.junit5.mockito.InjectMockComponents;
 import org.xwiki.test.junit5.mockito.MockComponent;
 
-import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 /**
@@ -44,28 +44,30 @@ class NotificationRecipientIndexListenerTest
     @InjectMockComponents
     private NotificationRecipientIndexListener listener;
 
-    @MockComponent
+    @MockComponent(classToMock = DefaultNotificationRecipientIndexManager.class)
     private NotificationRecipientIndexManager notificationRecipientIndexManager;
 
     @Test
-    void addOrUpdateRefreshesTheOwnerFromEventData() throws Exception
+    void addOrUpdateUsesThePreferenceSourceAndOwnerData() throws Exception
     {
-        DocumentReference user = new DocumentReference("xwiki", "XWiki", "User");
+        IndexableNotificationFilterPreference preference = mock(IndexableNotificationFilterPreference.class);
+        DocumentReference owner = new DocumentReference("xwiki", "XWiki", "User");
 
-        this.listener.onEvent(new NotificationFilterPreferenceAddOrUpdatedEvent(), new Object(), user);
+        this.listener.onEvent(new NotificationFilterPreferenceAddOrUpdatedEvent(), preference, owner);
 
-        verify(this.notificationRecipientIndexManager).refreshUser(user);
-        verify(this.notificationRecipientIndexManager, never()).clear();
+        verify((DefaultNotificationRecipientIndexManager) this.notificationRecipientIndexManager)
+            .addOrUpdatePreference("xwiki", preference);
     }
 
     @Test
-    void deleteRefreshesTheOwnerFromEventSource() throws Exception
+    void deleteUsesTheDeletedPreferenceIdsFromEventData() throws Exception
     {
         WikiReference wikiReference = new WikiReference("xwiki");
+        Set<String> preferenceIds = Set.of("NFP_42");
 
-        this.listener.onEvent(new NotificationFilterPreferenceDeletedEvent(), wikiReference, Set.of("NFP_42"));
+        this.listener.onEvent(new NotificationFilterPreferenceDeletedEvent(), wikiReference, preferenceIds);
 
-        verify(this.notificationRecipientIndexManager).refreshWiki(wikiReference);
-        verify(this.notificationRecipientIndexManager, never()).clear();
+        verify((DefaultNotificationRecipientIndexManager) this.notificationRecipientIndexManager)
+            .removePreferences("xwiki", preferenceIds);
     }
 }

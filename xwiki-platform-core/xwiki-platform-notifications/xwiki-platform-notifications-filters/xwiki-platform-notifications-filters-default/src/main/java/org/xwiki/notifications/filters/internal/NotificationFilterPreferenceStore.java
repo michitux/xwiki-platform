@@ -42,7 +42,6 @@ import org.xwiki.notifications.NotificationException;
 import org.xwiki.notifications.filters.NotificationFilterPreference;
 import org.xwiki.notifications.filters.internal.event.NotificationFilterPreferenceAddOrUpdatedEvent;
 import org.xwiki.notifications.filters.internal.event.NotificationFilterPreferenceDeletedEvent;
-import org.xwiki.notifications.filters.internal.recipient.IndexableNotificationFilterPreference;
 import org.xwiki.observation.ObservationManager;
 import org.xwiki.query.Query;
 import org.xwiki.query.QueryException;
@@ -238,7 +237,7 @@ public class NotificationFilterPreferenceStore
      * @throws NotificationException in case of error while loading the preferences
      * @since 18.4.0
      */
-    public List<IndexableNotificationFilterPreference> loadIndexablePreferencesBatch(String wikiId,
+    public List<DefaultNotificationFilterPreference> loadIndexablePreferencesBatch(String wikiId,
         long afterInternalId, int limit) throws NotificationException
     {
         return new ArrayList<>(configureContextWrapper(new WikiReference(wikiId), () -> {
@@ -362,7 +361,8 @@ public class NotificationFilterPreferenceStore
         throws NotificationException
     {
         this.deleteFilterPreferences(wikiReference, Set.of(getInternalIdFromId(filterPreferenceId)));
-        this.observation.notify(new NotificationFilterPreferenceDeletedEvent(), wikiReference, filterPreferenceId);
+        this.observation.notify(new NotificationFilterPreferenceDeletedEvent(), wikiReference,
+            Set.of(filterPreferenceId));
     }
 
     private long getInternalIdFromId(String filterPreferenceId) throws NotificationException

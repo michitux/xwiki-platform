@@ -19,6 +19,9 @@
  */
 package org.xwiki.notifications.filters.internal.recipient;
 
+import java.util.Collection;
+import java.util.Set;
+
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -26,7 +29,6 @@ import javax.inject.Singleton;
 import org.xwiki.component.annotation.Component;
 import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.model.reference.WikiReference;
-import org.xwiki.notifications.NotificationException;
 import org.xwiki.notifications.filters.internal.event.NotificationFilterPreferenceAddOrUpdatedEvent;
 import org.xwiki.notifications.filters.internal.event.NotificationFilterPreferenceDeletedEvent;
 import org.xwiki.observation.AbstractEventListener;
@@ -64,23 +66,58 @@ public class NotificationRecipientIndexListener extends AbstractEventListener
     @Override
     public void onEvent(Event event, Object source, Object data)
     {
-        try {
-            if (event instanceof NotificationFilterPreferenceAddOrUpdatedEvent) {
-                refreshOwner(data);
-            } else if (event instanceof NotificationFilterPreferenceDeletedEvent) {
-                refreshOwner(source);
-            }
-        } catch (NotificationException e) {
-            throw new RuntimeException("Failed to refresh the notification recipient index.", e);
+        if (event instanceof NotificationFilterPreferenceAddOrUpdatedEvent
+            && source instanceof IndexableNotificationFilterPreference preference) {
+            addOrUpdatePreference(preference, data);
+        } else if (event instanceof NotificationFilterPreferenceDeletedEvent) {
+            removePreferences(source, data);
         }
     }
 
-    private void refreshOwner(Object owner) throws NotificationException
+    private void addOrUpdatePreference(IndexableNotificationFilterPreference preference, Object owner)
+    {
+        String wikiId = getWikiId(owner);
+        if (wikiId != null) {
+            getDefaultNotificationRecipientIndexManager().addOrUpdatePreference(wikiId, preference);
+        }
+    }
+
+    private void removePreferences(Object owner, Object data)
+    {
+        String wikiId = getWikiId(owner);
+        Collection<String> preferenceIds = getPreferenceIds(data);
+        if (wikiId != null && !preferenceIds.isEmpty()) {
+            getDefaultNotificationRecipientIndexManager().removePreferences(wikiId, preferenceIds);
+        }
+    }
+
+    private DefaultNotificationRecipientIndexManager getDefaultNotificationRecipientIndexManager()
+    {
+        return (DefaultNotificationRecipientIndexManager) this.notificationRecipientIndexManager;
+    }
+
+    private String getWikiId(Object owner)
     {
         if (owner instanceof DocumentReference user) {
-            this.notificationRecipientIndexManager.refreshUser(user);
-        } else if (owner instanceof WikiReference wikiReference) {
-            this.notificationRecipientIndexManager.refreshWiki(wikiReference);
+            return user.getWikiReference().getName();
         }
+        if (owner instanceof WikiReference wikiReference) {
+            return wikiReference.getName();
+        }
+        return null;
+    }
+
+    private Collection<String> getPreferenceIds(Object data)
+    {
+        if (data instanceof String preferenceId) {
+            return Set.of(preferenceId);
+        }
+        if (data instanceof Collection<?> values) {
+            return values.stream()
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .collect(java.util.stream.Collectors.toSet());
+        }
+        return Set.of();
     }
 }

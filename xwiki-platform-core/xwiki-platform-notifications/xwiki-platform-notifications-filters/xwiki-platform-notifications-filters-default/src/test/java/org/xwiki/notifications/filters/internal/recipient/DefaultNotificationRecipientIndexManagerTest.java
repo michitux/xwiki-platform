@@ -36,7 +36,6 @@ import org.xwiki.test.junit5.mockito.InjectMockComponents;
 import org.xwiki.test.junit5.mockito.MockComponent;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -76,14 +75,13 @@ class DefaultNotificationRecipientIndexManagerTest
         NotificationRecipientIndex firstIndex = this.notificationRecipientIndexManager.getOrBuildIndex("xwiki");
         NotificationRecipientIndex secondIndex = this.notificationRecipientIndexManager.getOrBuildIndex("xwiki");
 
-        assertSame(firstIndex, secondIndex);
-        assertTrue(this.notificationRecipientIndexManager.getIfPresent("xwiki").isPresent());
+        assertTrue(firstIndex == secondIndex);
         verify(this.notificationFilterPreferenceStore, times(1))
             .loadIndexablePreferencesBatch("xwiki", 0, 100);
     }
 
     @Test
-    void refreshUserReplacesOnlyTheAffectedOwnerPreferences() throws Exception
+    void addOrUpdatePreferenceUpdatesAnAlreadyBuiltIndex() throws Exception
     {
         DocumentReference owner = new DocumentReference("xwiki", "XWiki", "User");
         DocumentReference oldPage = new DocumentReference("xwiki", "Old", "Page");
@@ -92,14 +90,12 @@ class DefaultNotificationRecipientIndexManagerTest
         Event newEvent = mock(Event.class, "newEvent");
         DefaultNotificationFilterPreference oldPreference =
             createPreference(12L, "xwiki:XWiki.User", "xwiki:Old.Page");
-        DefaultNotificationFilterPreference newPreference =
-            createPreference(13L, "xwiki:XWiki.User", "xwiki:New.Page");
+        DefaultNotificationFilterPreference updatedPreference =
+            createPreference(12L, "xwiki:XWiki.User", "xwiki:New.Page");
 
         when(this.notificationFilterPreferenceStore.loadIndexablePreferencesBatch("xwiki", 0, 100))
             .thenReturn(List.of(oldPreference));
-        when(this.notificationFilterPreferenceStore.getPreferencesOfUser(owner)).thenReturn(List.of(newPreference));
         when(this.documentReferenceResolver.resolve("xwiki:XWiki.User")).thenReturn(owner);
-        when(this.entityReferenceSerializer.serialize(owner)).thenReturn("xwiki:XWiki.User");
         when(this.entityReferenceSerializer.serialize(oldPage)).thenReturn("xwiki:Old.Page");
         when(this.entityReferenceSerializer.serialize(oldPage.getLastSpaceReference())).thenReturn("xwiki:Old");
         when(this.entityReferenceSerializer.serialize(newPage)).thenReturn("xwiki:New.Page");
@@ -112,10 +108,34 @@ class DefaultNotificationRecipientIndexManagerTest
         NotificationRecipientIndex index = this.notificationRecipientIndexManager.getOrBuildIndex("xwiki");
         assertEquals(Set.of(owner), index.findCandidates(oldEvent));
 
-        this.notificationRecipientIndexManager.refreshUser(owner);
+        this.notificationRecipientIndexManager.addOrUpdatePreference("xwiki", updatedPreference);
 
         assertTrue(index.findCandidates(oldEvent).isEmpty());
         assertEquals(Set.of(owner), index.findCandidates(newEvent));
+    }
+
+    @Test
+    void removePreferencesDeletesOnlyTheRequestedEntries() throws Exception
+    {
+        DocumentReference owner = new DocumentReference("xwiki", "XWiki", "User");
+        DocumentReference page = new DocumentReference("xwiki", "Space", "Page");
+        Event event = mock(Event.class);
+        DefaultNotificationFilterPreference preference = createPreference(12L, "xwiki:XWiki.User", "xwiki:Space.Page");
+
+        when(this.notificationFilterPreferenceStore.loadIndexablePreferencesBatch("xwiki", 0, 100))
+            .thenReturn(List.of(preference));
+        when(this.documentReferenceResolver.resolve("xwiki:XWiki.User")).thenReturn(owner);
+        when(this.entityReferenceSerializer.serialize(page)).thenReturn("xwiki:Space.Page");
+        when(this.entityReferenceSerializer.serialize(page.getLastSpaceReference())).thenReturn("xwiki:Space");
+        when(event.getWiki()).thenReturn(new WikiReference("xwiki"));
+        when(event.getDocument()).thenReturn(page);
+
+        NotificationRecipientIndex index = this.notificationRecipientIndexManager.getOrBuildIndex("xwiki");
+        assertEquals(Set.of(owner), index.findCandidates(event));
+
+        this.notificationRecipientIndexManager.removePreferences("xwiki", Set.of(preference.getId()));
+
+        assertTrue(index.findCandidates(event).isEmpty());
     }
 
     private DefaultNotificationFilterPreference createPreference(long internalId, String owner, String pageOnly)

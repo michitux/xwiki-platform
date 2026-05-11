@@ -52,9 +52,9 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
 
     private final DocumentReferenceResolver<String> documentReferenceResolver;
 
-    private final Map<Long, IndexedPreference> indexedPreferences = new HashMap<>();
+    private final Map<String, IndexedPreference> indexedPreferences = new HashMap<>();
 
-    private final Map<String, Set<Long>> indexedPreferencesByOwner = new HashMap<>();
+    private final Map<String, Set<String>> indexedPreferencesByOwner = new HashMap<>();
 
     private final Map<String, Map<String, Set<DocumentReference>>> pageOnlyIndex = new HashMap<>();
 
@@ -77,27 +77,33 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
         this.documentReferenceResolver = documentReferenceResolver;
     }
 
-    @Override
-    public synchronized void addOrUpdate(IndexableNotificationFilterPreference preference)
+    synchronized void addOrUpdate(IndexableNotificationFilterPreference preference)
     {
-        removeInternalPreference(preference.getInternalId());
+        if (StringUtils.isBlank(preference.getId())) {
+            return;
+        }
+
+        removePreference(preference.getId());
 
         IndexedPreference indexedPreference = IndexedPreference.create(preference, this.documentReferenceResolver);
         if (indexedPreference == null) {
             return;
         }
 
-        this.indexedPreferences.put(indexedPreference.getInternalId(), indexedPreference);
+        this.indexedPreferences.put(indexedPreference.getPreferenceId(), indexedPreference);
         this.indexedPreferencesByOwner.computeIfAbsent(indexedPreference.getOwnerKey(), ignored -> new HashSet<>())
-            .add(indexedPreference.getInternalId());
+            .add(indexedPreference.getPreferenceId());
         indexedPreference.addToIndexes(this.pageOnlyIndex, this.pageIndex, this.spaceIndex, this.wikiIndex,
             this.followedUserIndex);
     }
 
-    @Override
-    public synchronized void remove(IndexableNotificationFilterPreference preference)
+    synchronized void remove(String preferenceId)
     {
-        removeInternalPreference(preference.getInternalId());
+        if (StringUtils.isBlank(preferenceId)) {
+            return;
+        }
+
+        removePreference(preferenceId);
     }
 
     synchronized void replaceOwner(String owner,
@@ -139,19 +145,19 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
 
     private void removeOwnerPreferences(String owner)
     {
-        Set<Long> internalIds = this.indexedPreferencesByOwner.get(owner);
-        if (internalIds == null || internalIds.isEmpty()) {
+        Set<String> preferenceIds = this.indexedPreferencesByOwner.get(owner);
+        if (preferenceIds == null || preferenceIds.isEmpty()) {
             return;
         }
 
-        for (Long internalId : Set.copyOf(internalIds)) {
-            removeInternalPreference(internalId);
+        for (String preferenceId : Set.copyOf(preferenceIds)) {
+            removePreference(preferenceId);
         }
     }
 
-    private void removeInternalPreference(long internalId)
+    private void removePreference(String preferenceId)
     {
-        IndexedPreference indexedPreference = this.indexedPreferences.remove(internalId);
+        IndexedPreference indexedPreference = this.indexedPreferences.remove(preferenceId);
         if (indexedPreference == null) {
             return;
         }
@@ -159,9 +165,9 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
         indexedPreference.removeFromIndexes(this.pageOnlyIndex, this.pageIndex, this.spaceIndex, this.wikiIndex,
             this.followedUserIndex);
 
-        Set<Long> ownerPreferences = this.indexedPreferencesByOwner.get(indexedPreference.getOwnerKey());
+        Set<String> ownerPreferences = this.indexedPreferencesByOwner.get(indexedPreference.getOwnerKey());
         if (ownerPreferences != null) {
-            ownerPreferences.remove(internalId);
+            ownerPreferences.remove(preferenceId);
             if (ownerPreferences.isEmpty()) {
                 this.indexedPreferencesByOwner.remove(indexedPreference.getOwnerKey());
             }
@@ -202,7 +208,7 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
 
     private static final class IndexedPreference
     {
-        private final long internalId;
+        private final String preferenceId;
 
         private final String ownerKey;
 
@@ -214,10 +220,11 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
 
         private final Set<String> eventTypes;
 
-        private IndexedPreference(long internalId, String ownerKey, DocumentReference owner, IndexedPreferenceType type,
+        private IndexedPreference(String preferenceId, String ownerKey, DocumentReference owner,
+            IndexedPreferenceType type,
             String key, Set<String> eventTypes)
         {
-            this.internalId = internalId;
+            this.preferenceId = preferenceId;
             this.ownerKey = ownerKey;
             this.owner = owner;
             this.type = type;
@@ -228,7 +235,8 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
         private static IndexedPreference create(IndexableNotificationFilterPreference preference,
             DocumentReferenceResolver<String> documentReferenceResolver)
         {
-            if (!preference.isEnabled() || preference.getFilterType() != NotificationFilterType.INCLUSIVE) {
+            if (!preference.isEnabled() || preference.getFilterType() != NotificationFilterType.INCLUSIVE
+                || StringUtils.isBlank(preference.getId())) {
                 return null;
             }
 
@@ -243,7 +251,7 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
 
             if (EventUserFilter.FILTER_NAME.equals(preference.getFilterName())
                 && StringUtils.isNotBlank(preference.getUser())) {
-                return new IndexedPreference(preference.getInternalId(), preference.getOwner(), owner,
+                return new IndexedPreference(preference.getId(), preference.getOwner(), owner,
                     IndexedPreferenceType.FOLLOWED_USER, preference.getUser(), Collections.singleton(ALL_EVENT_TYPES));
             }
 
@@ -281,13 +289,13 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
                 return null;
             }
 
-            return new IndexedPreference(preference.getInternalId(), preference.getOwner(), owner,
+            return new IndexedPreference(preference.getId(), preference.getOwner(), owner,
                 indexedPreferenceType, key, getEventTypeKeys(preference));
         }
 
-        private long getInternalId()
+        private String getPreferenceId()
         {
-            return this.internalId;
+            return this.preferenceId;
         }
 
         private String getOwnerKey()

@@ -35,7 +35,6 @@ import org.xwiki.model.reference.EntityReferenceSerializer;
 import org.xwiki.model.reference.WikiReference;
 import org.xwiki.notifications.NotificationException;
 import org.xwiki.notifications.filters.internal.event.NotificationFilterPreferenceDeletedEvent;
-import org.xwiki.notifications.filters.internal.recipient.IndexableNotificationFilterPreference;
 import org.xwiki.observation.ObservationManager;
 import org.xwiki.query.Query;
 import org.xwiki.query.QueryException;
@@ -278,7 +277,7 @@ class NotificationFilterPreferenceStoreTest
         verify(this.context).setWikiReference(wikiReference);
         verify(this.context).setWikiReference(CURRENT_WIKI_REFERENCE);
         verify(this.observationManager).notify(
-            any(NotificationFilterPreferenceDeletedEvent.class), eq(wikiReference), eq(filterId));
+            any(NotificationFilterPreferenceDeletedEvent.class), eq(wikiReference), eq(Set.of(filterId)));
     }
 
     @Test
@@ -319,7 +318,7 @@ class NotificationFilterPreferenceStoreTest
         when(xwikiQuery.setLimit(10)).thenReturn(xwikiQuery);
         when(xwikiQuery.execute()).thenReturn(List.of(preference));
 
-        List<IndexableNotificationFilterPreference> preferences =
+        List<DefaultNotificationFilterPreference> preferences =
             this.notificationFilterPreferenceStore.loadIndexablePreferencesBatch("xwiki", 12L, 10);
 
         assertEquals(List.of(preference), preferences);
