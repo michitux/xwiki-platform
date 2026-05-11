@@ -211,7 +211,7 @@ class UserEventDispatcherTest
         when(this.entityReferenceSerializer.serialize(mainUserFoo)).thenReturn(mainUserFooStr);
         when(this.entityReferenceSerializer.serialize(mainUserBar)).thenReturn(mainUserBarStr);
         when(this.notificationRecipientResolver.resolveCandidateUsers(any())).thenReturn(
-            Set.of(mainUserFooStr, mainUserBarStr), Set.of(mainUserFooStr, mainUserBarStr));
+            Set.of(mainUserFoo, mainUserBar), Set.of(mainUserFoo, mainUserBar));
 
         SimpleEventQuery queryStatusE2R1 = new SimpleEventQuery(0, 0)
             .eq(Event.FIELD_ID, event2Result1Id)

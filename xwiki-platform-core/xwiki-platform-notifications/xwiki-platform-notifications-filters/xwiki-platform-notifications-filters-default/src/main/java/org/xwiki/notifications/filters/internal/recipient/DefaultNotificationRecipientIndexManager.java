@@ -28,7 +28,12 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 import org.xwiki.component.annotation.Component;
+import org.xwiki.model.reference.DocumentReference;
+import org.xwiki.model.reference.DocumentReferenceResolver;
+import org.xwiki.model.reference.EntityReferenceSerializer;
+import org.xwiki.model.reference.WikiReference;
 import org.xwiki.notifications.NotificationException;
+import org.xwiki.notifications.filters.internal.NotificationFilterPreferenceStore;
 
 /**
  * Default implementation of {@link NotificationRecipientIndexManager}.
@@ -43,9 +48,15 @@ public class DefaultNotificationRecipientIndexManager implements NotificationRec
     private static final int BATCH_SIZE = 100;
 
     @Inject
-    private NotificationFilterPreferenceIndexStore indexStore;
+    private NotificationFilterPreferenceStore notificationFilterPreferenceStore;
 
-    private final ConcurrentMap<String, NotificationRecipientIndex> indexes = new ConcurrentHashMap<>();
+    @Inject
+    private EntityReferenceSerializer<String> entityReferenceSerializer;
+
+    @Inject
+    private DocumentReferenceResolver<String> documentReferenceResolver;
+
+    private final ConcurrentMap<String, DefaultNotificationRecipientIndex> indexes = new ConcurrentHashMap<>();
 
     @Override
     public NotificationRecipientIndex getOrBuildIndex(String wikiId) throws NotificationException
@@ -61,7 +72,7 @@ public class DefaultNotificationRecipientIndexManager implements NotificationRec
                 return synchronizedIndex;
             }
 
-            NotificationRecipientIndex createdIndex = buildIndex(wikiId);
+            DefaultNotificationRecipientIndex createdIndex = buildIndex(wikiId);
             this.indexes.put(wikiId, createdIndex);
             return createdIndex;
         }
@@ -71,6 +82,20 @@ public class DefaultNotificationRecipientIndexManager implements NotificationRec
     public Optional<NotificationRecipientIndex> getIfPresent(String wikiId)
     {
         return Optional.ofNullable(this.indexes.get(wikiId));
+    }
+
+    @Override
+    public void refreshUser(DocumentReference user) throws NotificationException
+    {
+        refreshOwner(user.getWikiReference().getName(), this.entityReferenceSerializer.serialize(user),
+            this.notificationFilterPreferenceStore.getPreferencesOfUser(user));
+    }
+
+    @Override
+    public void refreshWiki(WikiReference wikiReference) throws NotificationException
+    {
+        refreshOwner(wikiReference.getName(), this.entityReferenceSerializer.serialize(wikiReference),
+            this.notificationFilterPreferenceStore.getPreferencesOfWiki(wikiReference));
     }
 
     @Override
@@ -85,14 +110,23 @@ public class DefaultNotificationRecipientIndexManager implements NotificationRec
         this.indexes.clear();
     }
 
-    private NotificationRecipientIndex buildIndex(String wikiId) throws NotificationException
+    private void refreshOwner(String wikiId, String owner, List<? extends IndexableNotificationFilterPreference> preferences)
     {
-        DefaultNotificationRecipientIndex index = new DefaultNotificationRecipientIndex();
+        DefaultNotificationRecipientIndex index = this.indexes.get(wikiId);
+        if (index != null) {
+            index.replaceOwner(owner, preferences);
+        }
+    }
+
+    private DefaultNotificationRecipientIndex buildIndex(String wikiId) throws NotificationException
+    {
+        DefaultNotificationRecipientIndex index =
+            new DefaultNotificationRecipientIndex(this.entityReferenceSerializer, this.documentReferenceResolver);
 
         long afterInternalId = 0;
         while (true) {
             List<IndexableNotificationFilterPreference> batch =
-                this.indexStore.loadIndexablePreferencesBatch(wikiId, afterInternalId, BATCH_SIZE);
+                this.notificationFilterPreferenceStore.loadIndexablePreferencesBatch(wikiId, afterInternalId, BATCH_SIZE);
             if (batch.isEmpty()) {
                 break;
             }

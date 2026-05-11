@@ -31,7 +31,6 @@ import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Singleton;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Strings;
 import org.xwiki.component.annotation.Component;
 import org.xwiki.model.EntityType;
@@ -44,7 +43,6 @@ import org.xwiki.notifications.filters.NotificationFilterPreference;
 import org.xwiki.notifications.filters.internal.event.NotificationFilterPreferenceAddOrUpdatedEvent;
 import org.xwiki.notifications.filters.internal.event.NotificationFilterPreferenceDeletedEvent;
 import org.xwiki.notifications.filters.internal.recipient.IndexableNotificationFilterPreference;
-import org.xwiki.notifications.filters.internal.recipient.NotificationFilterPreferenceIndexStore;
 import org.xwiki.observation.ObservationManager;
 import org.xwiki.query.Query;
 import org.xwiki.query.QueryException;
@@ -63,13 +61,11 @@ import com.xpn.xwiki.store.XWikiHibernateStore;
  * @since 10.8RC1
  * @since 9.11.8
  */
-@Component(roles = { NotificationFilterPreferenceStore.class, NotificationFilterPreferenceIndexStore.class })
+@Component(roles = NotificationFilterPreferenceStore.class)
 @Singleton
 @SuppressWarnings("checkstyle:ClassFanOutComplexity")
-public class NotificationFilterPreferenceStore implements NotificationFilterPreferenceIndexStore
+public class NotificationFilterPreferenceStore
 {
-    private static final String WIKI_SEPARATOR = ":";
-
     private static final String ID = "id";
 
     @Inject
@@ -232,7 +228,16 @@ public class NotificationFilterPreferenceStore implements NotificationFilterPref
         });
     }
 
-    @Override
+    /**
+     * Load a batch of preferences to initialize the notification recipient index of a wiki.
+     *
+     * @param wikiId the wiki database to scan
+     * @param afterInternalId only preferences with a greater internal id are returned
+     * @param limit the maximum number of preferences to return
+     * @return a batch of preferences ordered by internal id
+     * @throws NotificationException in case of error while loading the preferences
+     * @since 18.4.0
+     */
     public List<IndexableNotificationFilterPreference> loadIndexablePreferencesBatch(String wikiId,
         long afterInternalId, int limit) throws NotificationException
     {
@@ -250,31 +255,6 @@ public class NotificationFilterPreferenceStore implements NotificationFilterPref
                     "Error while loading the indexable notification filter preferences on wiki [%s].", wikiId), e);
             }
         }));
-    }
-
-    @Override
-    public List<IndexableNotificationFilterPreference> loadIndexablePreferencesForOwner(String owner)
-        throws NotificationException
-    {
-        String wikiId = Strings.CS.contains(owner, WIKI_SEPARATOR)
-            ? StringUtils.substringBefore(owner, WIKI_SEPARATOR) : owner;
-        return new ArrayList<>(configureContextWrapper(new WikiReference(wikiId), () -> {
-            try {
-                return new ArrayList<>(getPreferencesOfEntityReference(owner));
-            } catch (QueryException e) {
-                throw new NotificationException(
-                    String.format("Error while loading the notification filter preferences of the owner [%s].", owner),
-                    e);
-            }
-        }));
-    }
-
-    @Override
-    public Optional<IndexableNotificationFilterPreference> loadIndexablePreferenceById(String wikiId,
-        String preferenceId) throws NotificationException
-    {
-        return getFilterPreference(preferenceId, new WikiReference(wikiId))
-            .map(preference -> (IndexableNotificationFilterPreference) preference);
     }
 
     private List<DefaultNotificationFilterPreference> getPreferencesOfEntity(EntityReference entityReference)

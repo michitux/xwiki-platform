@@ -19,6 +19,11 @@
  */
 package org.xwiki.notifications.filters.internal.recipient;
 
+import java.util.Set;
+
+import org.xwiki.eventstream.Event;
+import org.xwiki.model.reference.DocumentReference;
+
 /**
  * Reverse index used to preselect notification recipient candidates for a wiki.
  *
@@ -42,20 +47,10 @@ public interface NotificationRecipientIndex
     void remove(IndexableNotificationFilterPreference preference);
 
     /**
-     * Remove an indexed preference by its public identifier.
-     *
-     * @param preferenceId the public preference identifier
-     * @since 18.4.0
-     */
-    default void remove(String preferenceId)
-    {
-    }
-
-    /**
      * Find candidate owners for an event.
      *
-     * @param eventDescriptor the event to analyze
+     * @param event the event to analyze
      * @return the candidate owners
      */
-    NotificationCandidateSet findCandidates(NotificationEventDescriptor eventDescriptor);
+    Set<DocumentReference> findCandidates(Event event);
 }

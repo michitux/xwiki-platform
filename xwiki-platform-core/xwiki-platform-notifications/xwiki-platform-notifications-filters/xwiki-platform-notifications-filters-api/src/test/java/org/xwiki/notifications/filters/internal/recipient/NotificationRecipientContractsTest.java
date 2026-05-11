@@ -20,8 +20,12 @@
 package org.xwiki.notifications.filters.internal.recipient;
 
 import java.util.Optional;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
+import org.xwiki.eventstream.Event;
+import org.xwiki.model.reference.DocumentReference;
+import org.xwiki.model.reference.WikiReference;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -36,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class NotificationRecipientContractsTest
 {
     @Test
-    void notificationRecipientIndexDefaultRemoveIsNoOp()
+    void notificationRecipientIndexManagerDefaultMethodsAreNoOp()
     {
         NotificationRecipientIndex notificationRecipientIndex = new NotificationRecipientIndex()
         {
@@ -51,18 +55,12 @@ class NotificationRecipientContractsTest
             }
 
             @Override
-            public NotificationCandidateSet findCandidates(NotificationEventDescriptor eventDescriptor)
+            public Set<DocumentReference> findCandidates(Event event)
             {
-                return new NotificationCandidateSet();
+                return Set.of();
             }
         };
 
-        assertDoesNotThrow(() -> notificationRecipientIndex.remove("NFP_42"));
-    }
-
-    @Test
-    void notificationRecipientIndexManagerDefaultGetIfPresentReturnsEmptyOptional()
-    {
         NotificationRecipientIndexManager notificationRecipientIndexManager = new NotificationRecipientIndexManager()
         {
             @Override
@@ -84,6 +82,10 @@ class NotificationRecipientContractsTest
 
         Optional<NotificationRecipientIndex> result = notificationRecipientIndexManager.getIfPresent("xwiki");
 
+        assertDoesNotThrow(() -> notificationRecipientIndex.remove(null));
+        assertDoesNotThrow(() ->
+            notificationRecipientIndexManager.refreshUser(new DocumentReference("xwiki", "XWiki", "User")));
+        assertDoesNotThrow(() -> notificationRecipientIndexManager.refreshWiki(new WikiReference("xwiki")));
         assertTrue(result.isEmpty());
         assertEquals(Optional.empty(), result);
     }

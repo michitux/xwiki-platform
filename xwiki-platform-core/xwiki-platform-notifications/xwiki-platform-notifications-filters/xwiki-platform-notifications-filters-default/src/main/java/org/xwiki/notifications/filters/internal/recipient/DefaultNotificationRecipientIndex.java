@@ -23,10 +23,17 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
+import org.xwiki.eventstream.Event;
+import org.xwiki.model.EntityType;
+import org.xwiki.model.reference.DocumentReference;
+import org.xwiki.model.reference.DocumentReferenceResolver;
+import org.xwiki.model.reference.EntityReference;
+import org.xwiki.model.reference.EntityReferenceSerializer;
 import org.xwiki.notifications.filters.NotificationFilterPreference;
 import org.xwiki.notifications.filters.NotificationFilterType;
 import org.xwiki.notifications.filters.internal.scope.ScopeNotificationFilter;
@@ -42,29 +49,48 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
 {
     static final String ALL_EVENT_TYPES = "__all__";
 
+    private final EntityReferenceSerializer<String> entityReferenceSerializer;
+
+    private final DocumentReferenceResolver<String> documentReferenceResolver;
+
     private final Map<Long, IndexedPreference> indexedPreferences = new HashMap<>();
 
-    private final Map<String, Map<String, Set<String>>> pageOnlyIndex = new HashMap<>();
+    private final Map<String, Set<Long>> indexedPreferencesByOwner = new HashMap<>();
 
-    private final Map<String, Map<String, Set<String>>> pageIndex = new HashMap<>();
+    private final Map<String, Map<String, Set<DocumentReference>>> pageOnlyIndex = new HashMap<>();
 
-    private final Map<String, Map<String, Set<String>>> spaceIndex = new HashMap<>();
+    private final Map<String, Map<String, Set<DocumentReference>>> pageIndex = new HashMap<>();
 
-    private final Map<String, Map<String, Set<String>>> wikiIndex = new HashMap<>();
+    private final Map<String, Map<String, Set<DocumentReference>>> spaceIndex = new HashMap<>();
 
-    private final Map<String, Set<String>> followedUserIndex = new HashMap<>();
+    private final Map<String, Map<String, Set<DocumentReference>>> wikiIndex = new HashMap<>();
+
+    private final Map<String, Set<DocumentReference>> followedUserIndex = new HashMap<>();
+
+    /**
+     * @param entityReferenceSerializer the serializer used for event references
+     * @param documentReferenceResolver the resolver used for indexed owners
+     */
+    public DefaultNotificationRecipientIndex(EntityReferenceSerializer<String> entityReferenceSerializer,
+        DocumentReferenceResolver<String> documentReferenceResolver)
+    {
+        this.entityReferenceSerializer = entityReferenceSerializer;
+        this.documentReferenceResolver = documentReferenceResolver;
+    }
 
     @Override
     public synchronized void addOrUpdate(IndexableNotificationFilterPreference preference)
     {
         removeInternalPreference(preference.getInternalId());
 
-        IndexedPreference indexedPreference = IndexedPreference.create(preference);
+        IndexedPreference indexedPreference = IndexedPreference.create(preference, this.documentReferenceResolver);
         if (indexedPreference == null) {
             return;
         }
 
         this.indexedPreferences.put(indexedPreference.getInternalId(), indexedPreference);
+        this.indexedPreferencesByOwner.computeIfAbsent(indexedPreference.getOwnerKey(), ignored -> new HashSet<>())
+            .add(indexedPreference.getInternalId());
         indexedPreference.addToIndexes(this.pageOnlyIndex, this.pageIndex, this.spaceIndex, this.wikiIndex,
             this.followedUserIndex);
     }
@@ -75,98 +101,112 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
         removeInternalPreference(preference.getInternalId());
     }
 
-    @Override
-    public synchronized void remove(String preferenceId)
+    synchronized void replaceOwner(String owner, Collection<? extends IndexableNotificationFilterPreference> preferences)
     {
-        if (StringUtils.startsWith(preferenceId, NotificationFilterPreference.DB_ID_FILTER_PREFIX)) {
-            long internalId = Long.parseLong(
-                preferenceId.substring(NotificationFilterPreference.DB_ID_FILTER_PREFIX.length()));
-            removeInternalPreference(internalId);
-        }
+        removeOwnerPreferences(owner);
+        preferences.forEach(this::addOrUpdate);
     }
 
     @Override
-    public synchronized NotificationCandidateSet findCandidates(NotificationEventDescriptor eventDescriptor)
+    public synchronized Set<DocumentReference> findCandidates(Event event)
     {
-        NotificationCandidateSet candidateSet = new NotificationCandidateSet();
+        Set<DocumentReference> candidateUsers = new LinkedHashSet<>();
+        String eventType = event.getType();
 
-        if (StringUtils.isNotBlank(eventDescriptor.getDocumentReference())) {
-            addCandidates(this.pageOnlyIndex, eventDescriptor.getDocumentReference(), eventDescriptor.getEventType(),
-                candidateSet::addScopeCandidateUser);
-            addCandidates(this.pageIndex, eventDescriptor.getDocumentReference(), eventDescriptor.getEventType(),
-                candidateSet::addScopeCandidateUser);
-        }
+        DocumentReference documentReference = event.getDocument();
+        if (documentReference != null) {
+            String serializedDocumentReference = this.entityReferenceSerializer.serialize(documentReference);
+            addCandidates(this.pageOnlyIndex, serializedDocumentReference, eventType, candidateUsers);
+            addCandidates(this.pageIndex, serializedDocumentReference, eventType, candidateUsers);
 
-        for (String spaceReference : eventDescriptor.getSpaceReferences()) {
-            addCandidates(this.pageIndex, spaceReference, eventDescriptor.getEventType(),
-                candidateSet::addScopeCandidateUser);
-            addCandidates(this.spaceIndex, spaceReference, eventDescriptor.getEventType(),
-                candidateSet::addScopeCandidateUser);
-        }
-
-        if (StringUtils.isNotBlank(eventDescriptor.getWikiId())) {
-            if (addCandidates(this.wikiIndex, eventDescriptor.getWikiId(), eventDescriptor.getEventType(),
-                candidateSet::addScopeCandidateUser)) {
-                candidateSet.setBroadWikiMatch(true);
+            for (String spaceReference : getSpaceReferences(documentReference)) {
+                addCandidates(this.pageIndex, spaceReference, eventType, candidateUsers);
+                addCandidates(this.spaceIndex, spaceReference, eventType, candidateUsers);
             }
         }
 
-        if (StringUtils.isNotBlank(eventDescriptor.getActor())) {
-            for (String owner : this.followedUserIndex.getOrDefault(eventDescriptor.getActor(),
-                Collections.emptySet())) {
-                candidateSet.addFollowedUserCandidateUser(owner);
-            }
+        if (event.getWiki() != null) {
+            addCandidates(this.wikiIndex, event.getWiki().getName(), eventType, candidateUsers);
         }
 
-        return candidateSet;
+        if (event.getUser() != null) {
+            candidateUsers.addAll(this.followedUserIndex.getOrDefault(
+                this.entityReferenceSerializer.serialize(event.getUser()), Collections.emptySet()));
+        }
+
+        return candidateUsers;
+    }
+
+    private void removeOwnerPreferences(String owner)
+    {
+        Set<Long> internalIds = this.indexedPreferencesByOwner.get(owner);
+        if (internalIds == null || internalIds.isEmpty()) {
+            return;
+        }
+
+        for (Long internalId : Set.copyOf(internalIds)) {
+            removeInternalPreference(internalId);
+        }
     }
 
     private void removeInternalPreference(long internalId)
     {
         IndexedPreference indexedPreference = this.indexedPreferences.remove(internalId);
-        if (indexedPreference != null) {
-            indexedPreference.removeFromIndexes(this.pageOnlyIndex, this.pageIndex, this.spaceIndex, this.wikiIndex,
-                this.followedUserIndex);
+        if (indexedPreference == null) {
+            return;
+        }
+
+        indexedPreference.removeFromIndexes(this.pageOnlyIndex, this.pageIndex, this.spaceIndex, this.wikiIndex,
+            this.followedUserIndex);
+
+        Set<Long> ownerPreferences = this.indexedPreferencesByOwner.get(indexedPreference.getOwnerKey());
+        if (ownerPreferences != null) {
+            ownerPreferences.remove(internalId);
+            if (ownerPreferences.isEmpty()) {
+                this.indexedPreferencesByOwner.remove(indexedPreference.getOwnerKey());
+            }
         }
     }
 
-    private boolean addCandidates(Map<String, Map<String, Set<String>>> index, String key, String eventType,
-        CandidateCollector collector)
+    private void addCandidates(Map<String, Map<String, Set<DocumentReference>>> index, String key, String eventType,
+        Set<DocumentReference> collector)
     {
-        Map<String, Set<String>> eventTypeIndex = index.get(key);
+        Map<String, Set<DocumentReference>> eventTypeIndex = index.get(key);
         if (eventTypeIndex == null) {
-            return false;
+            return;
         }
 
-        boolean found = false;
-        found |= addCandidateOwners(eventTypeIndex.get(ALL_EVENT_TYPES), collector);
+        addCandidateOwners(eventTypeIndex.get(ALL_EVENT_TYPES), collector);
         if (StringUtils.isNotBlank(eventType)) {
-            found |= addCandidateOwners(eventTypeIndex.get(eventType), collector);
+            addCandidateOwners(eventTypeIndex.get(eventType), collector);
         }
-        return found;
     }
 
-    private boolean addCandidateOwners(Collection<String> owners, CandidateCollector collector)
+    private void addCandidateOwners(Collection<DocumentReference> owners, Set<DocumentReference> collector)
     {
-        if (owners == null || owners.isEmpty()) {
-            return false;
+        if (owners != null && !owners.isEmpty()) {
+            collector.addAll(owners);
         }
-
-        owners.forEach(collector::collect);
-        return true;
     }
 
-    @FunctionalInterface
-    private interface CandidateCollector
+    private Set<String> getSpaceReferences(DocumentReference documentReference)
     {
-        void collect(String owner);
+        Set<String> result = new LinkedHashSet<>();
+        EntityReference current = documentReference.getParent();
+        while (current != null && current.getType() == EntityType.SPACE) {
+            result.add(this.entityReferenceSerializer.serialize(current));
+            current = current.getParent();
+        }
+        return result;
     }
 
     private static final class IndexedPreference
     {
         private final long internalId;
 
-        private final String owner;
+        private final String ownerKey;
+
+        private final DocumentReference owner;
 
         private final IndexedPreferenceType type;
 
@@ -174,36 +214,55 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
 
         private final Set<String> eventTypes;
 
-        private IndexedPreference(long internalId, String owner, IndexedPreferenceType type, String key,
-            Set<String> eventTypes)
+        private IndexedPreference(long internalId, String ownerKey, DocumentReference owner, IndexedPreferenceType type,
+            String key, Set<String> eventTypes)
         {
             this.internalId = internalId;
+            this.ownerKey = ownerKey;
             this.owner = owner;
             this.type = type;
             this.key = key;
             this.eventTypes = eventTypes;
         }
 
-        private static IndexedPreference create(IndexableNotificationFilterPreference preference)
+        private static IndexedPreference create(IndexableNotificationFilterPreference preference,
+            DocumentReferenceResolver<String> documentReferenceResolver)
         {
             if (!preference.isEnabled() || preference.getFilterType() != NotificationFilterType.INCLUSIVE) {
                 return null;
             }
 
+            DocumentReference owner = resolveOwner(preference, documentReferenceResolver);
+            if (owner == null) {
+                return null;
+            }
+
             if (ScopeNotificationFilter.FILTER_NAME.equals(preference.getFilterName())) {
-                return createScopePreference(preference);
+                return createScopePreference(preference, owner);
             }
 
             if (EventUserFilter.FILTER_NAME.equals(preference.getFilterName())
                 && StringUtils.isNotBlank(preference.getUser())) {
-                return new IndexedPreference(preference.getInternalId(), preference.getOwner(),
+                return new IndexedPreference(preference.getInternalId(), preference.getOwner(), owner,
                     IndexedPreferenceType.FOLLOWED_USER, preference.getUser(), Collections.singleton(ALL_EVENT_TYPES));
             }
 
             return null;
         }
 
-        private static IndexedPreference createScopePreference(IndexableNotificationFilterPreference preference)
+        private static DocumentReference resolveOwner(IndexableNotificationFilterPreference preference,
+            DocumentReferenceResolver<String> documentReferenceResolver)
+        {
+            String owner = preference.getOwner();
+            if (StringUtils.isBlank(owner)
+                || !StringUtils.contains(owner, NotificationFilterPreference.DB_SPACE_SEP)) {
+                return null;
+            }
+            return documentReferenceResolver.resolve(owner);
+        }
+
+        private static IndexedPreference createScopePreference(IndexableNotificationFilterPreference preference,
+            DocumentReference owner)
         {
             IndexedPreferenceType indexedPreferenceType = null;
             String key = null;
@@ -223,8 +282,8 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
                 return null;
             }
 
-            return new IndexedPreference(preference.getInternalId(), preference.getOwner(), indexedPreferenceType, key,
-                getEventTypeKeys(preference));
+            return new IndexedPreference(preference.getInternalId(), preference.getOwner(), owner,
+                indexedPreferenceType, key, getEventTypeKeys(preference));
         }
 
         private long getInternalId()
@@ -232,25 +291,36 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
             return this.internalId;
         }
 
-        private void addToIndexes(Map<String, Map<String, Set<String>>> pageOnlyIndex,
-            Map<String, Map<String, Set<String>>> pageIndex, Map<String, Map<String, Set<String>>> spaceIndex,
-            Map<String, Map<String, Set<String>>> wikiIndex, Map<String, Set<String>> followedUserIndex)
+        private String getOwnerKey()
+        {
+            return this.ownerKey;
+        }
+
+        private void addToIndexes(Map<String, Map<String, Set<DocumentReference>>> pageOnlyIndex,
+            Map<String, Map<String, Set<DocumentReference>>> pageIndex,
+            Map<String, Map<String, Set<DocumentReference>>> spaceIndex,
+            Map<String, Map<String, Set<DocumentReference>>> wikiIndex,
+            Map<String, Set<DocumentReference>> followedUserIndex)
         {
             if (this.type == IndexedPreferenceType.FOLLOWED_USER) {
                 followedUserIndex.computeIfAbsent(this.key, ignored -> new HashSet<>()).add(this.owner);
                 return;
             }
 
-            Map<String, Map<String, Set<String>>> index = getIndex(pageOnlyIndex, pageIndex, spaceIndex, wikiIndex);
-            Map<String, Set<String>> eventTypeIndex = index.computeIfAbsent(this.key, ignored -> new HashMap<>());
+            Map<String, Map<String, Set<DocumentReference>>> index =
+                getIndex(pageOnlyIndex, pageIndex, spaceIndex, wikiIndex);
+            Map<String, Set<DocumentReference>> eventTypeIndex = index.computeIfAbsent(this.key,
+                ignored -> new HashMap<>());
             for (String eventType : this.eventTypes) {
                 eventTypeIndex.computeIfAbsent(eventType, ignored -> new HashSet<>()).add(this.owner);
             }
         }
 
-        private void removeFromIndexes(Map<String, Map<String, Set<String>>> pageOnlyIndex,
-            Map<String, Map<String, Set<String>>> pageIndex, Map<String, Map<String, Set<String>>> spaceIndex,
-            Map<String, Map<String, Set<String>>> wikiIndex, Map<String, Set<String>> followedUserIndex)
+        private void removeFromIndexes(Map<String, Map<String, Set<DocumentReference>>> pageOnlyIndex,
+            Map<String, Map<String, Set<DocumentReference>>> pageIndex,
+            Map<String, Map<String, Set<DocumentReference>>> spaceIndex,
+            Map<String, Map<String, Set<DocumentReference>>> wikiIndex,
+            Map<String, Set<DocumentReference>> followedUserIndex)
         {
             if (this.type == IndexedPreferenceType.FOLLOWED_USER) {
                 removeFromFollowedUserIndex(followedUserIndex);
@@ -260,9 +330,11 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
             removeFromLocationIndex(getIndex(pageOnlyIndex, pageIndex, spaceIndex, wikiIndex));
         }
 
-        private Map<String, Map<String, Set<String>>> getIndex(Map<String, Map<String, Set<String>>> pageOnlyIndex,
-            Map<String, Map<String, Set<String>>> pageIndex, Map<String, Map<String, Set<String>>> spaceIndex,
-            Map<String, Map<String, Set<String>>> wikiIndex)
+        private Map<String, Map<String, Set<DocumentReference>>> getIndex(
+            Map<String, Map<String, Set<DocumentReference>>> pageOnlyIndex,
+            Map<String, Map<String, Set<DocumentReference>>> pageIndex,
+            Map<String, Map<String, Set<DocumentReference>>> spaceIndex,
+            Map<String, Map<String, Set<DocumentReference>>> wikiIndex)
         {
             return switch (this.type) {
                 case PAGE_ONLY -> pageOnlyIndex;
@@ -274,15 +346,15 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
             };
         }
 
-        private void removeFromLocationIndex(Map<String, Map<String, Set<String>>> index)
+        private void removeFromLocationIndex(Map<String, Map<String, Set<DocumentReference>>> index)
         {
-            Map<String, Set<String>> eventTypeIndex = index.get(this.key);
+            Map<String, Set<DocumentReference>> eventTypeIndex = index.get(this.key);
             if (eventTypeIndex == null) {
                 return;
             }
 
             for (String eventType : this.eventTypes) {
-                Set<String> owners = eventTypeIndex.get(eventType);
+                Set<DocumentReference> owners = eventTypeIndex.get(eventType);
                 if (owners != null) {
                     owners.remove(this.owner);
                     if (owners.isEmpty()) {
@@ -296,9 +368,9 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
             }
         }
 
-        private void removeFromFollowedUserIndex(Map<String, Set<String>> followedUserIndex)
+        private void removeFromFollowedUserIndex(Map<String, Set<DocumentReference>> followedUserIndex)
         {
-            Set<String> owners = followedUserIndex.get(this.key);
+            Set<DocumentReference> owners = followedUserIndex.get(this.key);
             if (owners != null) {
                 owners.remove(this.owner);
                 if (owners.isEmpty()) {

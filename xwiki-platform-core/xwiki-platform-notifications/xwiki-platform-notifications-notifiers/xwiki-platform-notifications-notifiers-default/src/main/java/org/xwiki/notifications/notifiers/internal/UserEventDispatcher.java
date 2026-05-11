@@ -47,16 +47,13 @@ import org.xwiki.eventstream.internal.DefaultEntityEvent;
 import org.xwiki.eventstream.internal.DefaultEventStatus;
 import org.xwiki.eventstream.query.SimpleEventQuery;
 import org.xwiki.eventstream.query.SortableEventQuery.SortClause.Order;
-import org.xwiki.model.EntityType;
 import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.model.reference.DocumentReferenceResolver;
-import org.xwiki.model.reference.EntityReference;
 import org.xwiki.model.reference.EntityReferenceSerializer;
 import org.xwiki.model.reference.WikiReference;
 import org.xwiki.notifications.NotificationConfiguration;
 import org.xwiki.notifications.NotificationException;
 import org.xwiki.notifications.NotificationFormat;
-import org.xwiki.notifications.filters.internal.recipient.NotificationEventDescriptor;
 import org.xwiki.notifications.filters.internal.recipient.NotificationRecipientResolver;
 import org.xwiki.notifications.filters.internal.DeletedDocumentCleanUpFilterProcessingQueue;
 import org.xwiki.observation.remote.RemoteObservationManagerConfiguration;
@@ -276,9 +273,8 @@ public class UserEventDispatcher
         boolean mailEnabled = this.notificationConfiguration.areEmailsEnabled();
 
         try {
-            NotificationEventDescriptor eventDescriptor = createEventDescriptor(event);
-            for (String serializedUser : this.notificationRecipientResolver.resolveCandidateUsers(eventDescriptor)) {
-                dispatch(event, this.resolver.resolve(serializedUser, event.getWiki()), mailEnabled);
+            for (DocumentReference user : this.notificationRecipientResolver.resolveCandidateUsers(event)) {
+                dispatch(event, user, mailEnabled);
             }
         } catch (NotificationException e) {
             this.logger.warn(
@@ -299,37 +295,6 @@ public class UserEventDispatcher
                 this.userCache.getUsers(new WikiReference(this.wikiManager.getMainWikiId()), true);
             dispatch(event, userList);
         }
-    }
-
-    private NotificationEventDescriptor createEventDescriptor(Event event)
-    {
-        DocumentReference documentReference = event.getDocument();
-        NotificationEventDescriptor.Builder builder = NotificationEventDescriptor.builder()
-            .wikiId(event.getWiki().getName())
-            .eventType(event.getType())
-            .eventDate(event.getDate());
-
-        if (documentReference != null) {
-            builder.documentReference(this.entityReferenceSerializer.serialize(documentReference))
-                .spaceReferences(getSpaceReferences(documentReference));
-        }
-
-        if (event.getUser() != null) {
-            builder.actor(this.entityReferenceSerializer.serialize(event.getUser()));
-        }
-
-        return builder.build();
-    }
-
-    private List<String> getSpaceReferences(DocumentReference documentReference)
-    {
-        List<String> result = new ArrayList<>();
-        EntityReference current = documentReference.getParent();
-        while (current != null && current.getType() == EntityType.SPACE) {
-            result.add(this.entityReferenceSerializer.serialize(current));
-            current = current.getParent();
-        }
-        return result;
     }
 
     private void dispatch(Event event, DocumentReference user, boolean mailEnabled)

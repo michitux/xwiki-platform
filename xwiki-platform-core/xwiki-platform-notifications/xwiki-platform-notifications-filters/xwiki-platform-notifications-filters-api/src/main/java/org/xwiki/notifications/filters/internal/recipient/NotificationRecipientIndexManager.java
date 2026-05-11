@@ -22,6 +22,8 @@ package org.xwiki.notifications.filters.internal.recipient;
 import java.util.Optional;
 
 import org.xwiki.component.annotation.Role;
+import org.xwiki.model.reference.DocumentReference;
+import org.xwiki.model.reference.WikiReference;
 import org.xwiki.notifications.NotificationException;
 
 /**
@@ -49,6 +51,28 @@ public interface NotificationRecipientIndexManager
     default Optional<NotificationRecipientIndex> getIfPresent(String wikiId)
     {
         return Optional.empty();
+    }
+
+    /**
+     * Refresh the indexed preferences of a user in an already built wiki index, if any.
+     *
+     * @param user the user whose preferences changed
+     * @throws NotificationException in case of error while loading the preferences
+     * @since 18.4.0
+     */
+    default void refreshUser(DocumentReference user) throws NotificationException
+    {
+    }
+
+    /**
+     * Refresh the indexed preferences of a wiki owner in an already built wiki index, if any.
+     *
+     * @param wikiReference the wiki whose preferences changed
+     * @throws NotificationException in case of error while loading the preferences
+     * @since 18.4.0
+     */
+    default void refreshWiki(WikiReference wikiReference) throws NotificationException
+    {
     }
 
     /**

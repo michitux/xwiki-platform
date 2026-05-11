@@ -22,6 +22,8 @@ package org.xwiki.notifications.filters.internal.recipient;
 import java.util.Set;
 
 import org.xwiki.component.annotation.Role;
+import org.xwiki.eventstream.Event;
+import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.notifications.NotificationException;
 
 /**
@@ -36,9 +38,9 @@ public interface NotificationRecipientResolver
     /**
      * Resolve the candidate owners that may receive a notification for the given event.
      *
-     * @param eventDescriptor the event to evaluate
+     * @param event the event to evaluate
      * @return the candidate owners
      * @throws NotificationException in case of error while resolving the candidates
      */
-    Set<String> resolveCandidateUsers(NotificationEventDescriptor eventDescriptor) throws NotificationException;
+    Set<DocumentReference> resolveCandidateUsers(Event event) throws NotificationException;
 }

@@ -19,13 +19,14 @@
  */
 package org.xwiki.notifications.filters.internal.recipient;
 
-import java.util.Optional;
-
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
 import org.xwiki.component.annotation.Component;
+import org.xwiki.model.reference.DocumentReference;
+import org.xwiki.model.reference.WikiReference;
+import org.xwiki.notifications.NotificationException;
 import org.xwiki.notifications.filters.internal.event.NotificationFilterPreferenceAddOrUpdatedEvent;
 import org.xwiki.notifications.filters.internal.event.NotificationFilterPreferenceDeletedEvent;
 import org.xwiki.observation.AbstractEventListener;
@@ -63,17 +64,23 @@ public class NotificationRecipientIndexListener extends AbstractEventListener
     @Override
     public void onEvent(Event event, Object source, Object data)
     {
-        if (event instanceof NotificationFilterPreferenceDeletedEvent) {
-            this.notificationRecipientIndexManager.clear();
-            return;
-        }
-
-        if (source instanceof IndexableNotificationFilterPreference preference) {
-            Optional<String> wikiId = preference.getWikiId();
-            if (wikiId.isPresent()) {
-                this.notificationRecipientIndexManager.getIfPresent(wikiId.get())
-                    .ifPresent(index -> index.addOrUpdate(preference));
+        try {
+            if (event instanceof NotificationFilterPreferenceAddOrUpdatedEvent) {
+                refreshOwner(data);
+            } else if (event instanceof NotificationFilterPreferenceDeletedEvent) {
+                refreshOwner(source);
             }
+        } catch (NotificationException e) {
+            throw new RuntimeException("Failed to refresh the notification recipient index.", e);
+        }
+    }
+
+    private void refreshOwner(Object owner) throws NotificationException
+    {
+        if (owner instanceof DocumentReference user) {
+            this.notificationRecipientIndexManager.refreshUser(user);
+        } else if (owner instanceof WikiReference wikiReference) {
+            this.notificationRecipientIndexManager.refreshWiki(wikiReference);
         }
     }
 }

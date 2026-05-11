@@ -19,18 +19,23 @@
  */
 package org.xwiki.notifications.filters.internal.recipient;
 
-import java.util.Date;
-import java.util.List;
 import java.util.Set;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.xwiki.eventstream.Event;
+import org.xwiki.model.reference.DocumentReference;
+import org.xwiki.model.reference.DocumentReferenceResolver;
+import org.xwiki.model.reference.EntityReferenceSerializer;
+import org.xwiki.model.reference.WikiReference;
 import org.xwiki.notifications.NotificationFormat;
 import org.xwiki.notifications.filters.NotificationFilterType;
 import org.xwiki.notifications.filters.internal.DefaultNotificationFilterPreference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests for {@link DefaultNotificationRecipientIndex}.
@@ -40,64 +45,94 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class DefaultNotificationRecipientIndexTest
 {
+    private static final String PAGE_REFERENCE = "xwiki:Space.Page";
+
+    private static final String SPACE_REFERENCE = "xwiki:Space";
+
+    private static final String ACTOR_REFERENCE = "xwiki:XWiki.Actor";
+
+    private EntityReferenceSerializer<String> entityReferenceSerializer;
+
+    private DocumentReferenceResolver<String> documentReferenceResolver;
+
+    private DefaultNotificationRecipientIndex index;
+
+    @BeforeEach
+    void setUp()
+    {
+        this.entityReferenceSerializer = mock(EntityReferenceSerializer.class);
+        this.documentReferenceResolver = mock(DocumentReferenceResolver.class);
+        this.index = new DefaultNotificationRecipientIndex(this.entityReferenceSerializer, this.documentReferenceResolver);
+    }
+
     @Test
     void findCandidatesUsesEventTypeSpecificAndAllTypesBuckets()
     {
-        DefaultNotificationRecipientIndex index = new DefaultNotificationRecipientIndex();
-        index.addOrUpdate(createScopePreference(1L, "xwiki:XWiki.PageWatcher", "xwiki:Space.Page", null, null,
+        DocumentReference pageWatcher = new DocumentReference("xwiki", "XWiki", "PageWatcher");
+        DocumentReference wikiWatcher = new DocumentReference("xwiki", "XWiki", "WikiWatcher");
+        DocumentReference actorWatcher = new DocumentReference("xwiki", "XWiki", "ActorWatcher");
+        DocumentReference pageReference = new DocumentReference("xwiki", "Space", "Page");
+        DocumentReference actorReference = new DocumentReference("xwiki", "XWiki", "Actor");
+        Event updateEvent = mock(Event.class, "updateEvent");
+        Event deleteEvent = mock(Event.class, "deleteEvent");
+
+        when(this.documentReferenceResolver.resolve("xwiki:XWiki.PageWatcher")).thenReturn(pageWatcher);
+        when(this.documentReferenceResolver.resolve("xwiki:XWiki.WikiWatcher")).thenReturn(wikiWatcher);
+        when(this.documentReferenceResolver.resolve("xwiki:XWiki.ActorWatcher")).thenReturn(actorWatcher);
+        when(this.entityReferenceSerializer.serialize(pageReference)).thenReturn(PAGE_REFERENCE);
+        when(this.entityReferenceSerializer.serialize(pageReference.getLastSpaceReference())).thenReturn(SPACE_REFERENCE);
+        when(this.entityReferenceSerializer.serialize(actorReference)).thenReturn(ACTOR_REFERENCE);
+
+        this.index.addOrUpdate(createScopePreference(1L, "xwiki:XWiki.PageWatcher", PAGE_REFERENCE, null, null,
             Set.of()));
-        index.addOrUpdate(createScopePreference(2L, "xwiki:XWiki.WikiWatcher", null, null, "xwiki",
+        this.index.addOrUpdate(createScopePreference(2L, "xwiki:XWiki.WikiWatcher", null, null, "xwiki",
             Set.of("update")));
-        index.addOrUpdate(createFollowedUserPreference(3L, "xwiki:XWiki.ActorWatcher", "xwiki:XWiki.Actor"));
+        this.index.addOrUpdate(createFollowedUserPreference(3L, "xwiki:XWiki.ActorWatcher", ACTOR_REFERENCE));
 
-        NotificationCandidateSet updateCandidates = index.findCandidates(NotificationEventDescriptor.builder()
-            .wikiId("xwiki")
-            .documentReference("xwiki:Space.Page")
-            .spaceReferences(List.of("xwiki:Space"))
-            .eventType("update")
-            .actor("xwiki:XWiki.Actor")
-            .eventDate(new Date())
-            .format(NotificationFormat.ALERT)
-            .build());
+        when(updateEvent.getWiki()).thenReturn(new WikiReference("xwiki"));
+        when(updateEvent.getDocument()).thenReturn(pageReference);
+        when(updateEvent.getType()).thenReturn("update");
+        when(updateEvent.getUser()).thenReturn(actorReference);
 
-        assertEquals(Set.of("xwiki:XWiki.PageWatcher", "xwiki:XWiki.WikiWatcher"),
-            updateCandidates.getScopeCandidateUsers());
-        assertEquals(Set.of("xwiki:XWiki.ActorWatcher"), updateCandidates.getFollowedUserCandidateUsers());
-        assertTrue(updateCandidates.hasBroadWikiMatch());
+        assertEquals(Set.of(pageWatcher, wikiWatcher, actorWatcher), this.index.findCandidates(updateEvent));
 
-        NotificationCandidateSet deleteCandidates = index.findCandidates(NotificationEventDescriptor.builder()
-            .wikiId("xwiki")
-            .documentReference("xwiki:Space.Page")
-            .spaceReferences(List.of("xwiki:Space"))
-            .eventType("delete")
-            .build());
+        when(deleteEvent.getWiki()).thenReturn(new WikiReference("xwiki"));
+        when(deleteEvent.getDocument()).thenReturn(pageReference);
+        when(deleteEvent.getType()).thenReturn("delete");
 
-        assertEquals(Set.of("xwiki:XWiki.PageWatcher"), deleteCandidates.getScopeCandidateUsers());
-        assertFalse(deleteCandidates.hasBroadWikiMatch());
+        assertEquals(Set.of(pageWatcher), this.index.findCandidates(deleteEvent));
     }
 
     @Test
     void addOrUpdateReplacesPreviousEntry()
     {
-        DefaultNotificationRecipientIndex index = new DefaultNotificationRecipientIndex();
-        index.addOrUpdate(createScopePreference(4L, "xwiki:XWiki.User", "xwiki:Old.Page", null, null, Set.of()));
-        index.addOrUpdate(createScopePreference(4L, "xwiki:XWiki.User", "xwiki:New.Page", null, null, Set.of()));
+        DocumentReference owner = new DocumentReference("xwiki", "XWiki", "User");
+        DocumentReference oldPage = new DocumentReference("xwiki", "Old", "Page");
+        DocumentReference newPage = new DocumentReference("xwiki", "New", "Page");
+        Event oldEvent = mock(Event.class, "oldEvent");
+        Event newEvent = mock(Event.class, "newEvent");
 
-        NotificationCandidateSet oldCandidates = index.findCandidates(NotificationEventDescriptor.builder()
-            .wikiId("xwiki")
-            .documentReference("xwiki:Old.Page")
-            .build());
-        NotificationCandidateSet newCandidates = index.findCandidates(NotificationEventDescriptor.builder()
-            .wikiId("xwiki")
-            .documentReference("xwiki:New.Page")
-            .build());
+        when(this.documentReferenceResolver.resolve("xwiki:XWiki.User")).thenReturn(owner);
+        when(this.entityReferenceSerializer.serialize(oldPage)).thenReturn("xwiki:Old.Page");
+        when(this.entityReferenceSerializer.serialize(oldPage.getLastSpaceReference())).thenReturn("xwiki:Old");
+        when(this.entityReferenceSerializer.serialize(newPage)).thenReturn("xwiki:New.Page");
+        when(this.entityReferenceSerializer.serialize(newPage.getLastSpaceReference())).thenReturn("xwiki:New");
 
-        assertTrue(oldCandidates.getCandidateUsers().isEmpty());
-        assertEquals(Set.of("xwiki:XWiki.User"), newCandidates.getCandidateUsers());
+        this.index.addOrUpdate(createScopePreference(4L, "xwiki:XWiki.User", "xwiki:Old.Page", null, null,
+            Set.of()));
+        this.index.addOrUpdate(createScopePreference(4L, "xwiki:XWiki.User", "xwiki:New.Page", null, null,
+            Set.of()));
 
-        index.remove("NFP_4");
-        assertTrue(index.findCandidates(NotificationEventDescriptor.builder().wikiId("xwiki")
-            .documentReference("xwiki:New.Page").build()).getCandidateUsers().isEmpty());
+        when(oldEvent.getWiki()).thenReturn(new WikiReference("xwiki"));
+        when(oldEvent.getDocument()).thenReturn(oldPage);
+        when(newEvent.getWiki()).thenReturn(new WikiReference("xwiki"));
+        when(newEvent.getDocument()).thenReturn(newPage);
+
+        assertTrue(this.index.findCandidates(oldEvent).isEmpty());
+        assertEquals(Set.of(owner), this.index.findCandidates(newEvent));
+
+        this.index.remove(createScopePreference(4L, "xwiki:XWiki.User", "xwiki:New.Page", null, null, Set.of()));
+        assertTrue(this.index.findCandidates(newEvent).isEmpty());
     }
 
     private DefaultNotificationFilterPreference createScopePreference(long internalId, String owner, String pageOnly,
