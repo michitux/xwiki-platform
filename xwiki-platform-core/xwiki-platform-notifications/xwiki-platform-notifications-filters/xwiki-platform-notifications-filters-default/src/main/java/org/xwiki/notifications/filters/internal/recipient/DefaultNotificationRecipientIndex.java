@@ -34,7 +34,6 @@ import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.model.reference.DocumentReferenceResolver;
 import org.xwiki.model.reference.EntityReference;
 import org.xwiki.model.reference.EntityReferenceSerializer;
-import org.xwiki.notifications.filters.NotificationFilterPreference;
 import org.xwiki.notifications.filters.NotificationFilterType;
 import org.xwiki.notifications.filters.internal.scope.ScopeNotificationFilter;
 import org.xwiki.notifications.filters.internal.user.EventUserFilter;
@@ -101,7 +100,8 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
         removeInternalPreference(preference.getInternalId());
     }
 
-    synchronized void replaceOwner(String owner, Collection<? extends IndexableNotificationFilterPreference> preferences)
+    synchronized void replaceOwner(String owner,
+        Collection<? extends IndexableNotificationFilterPreference> preferences)
     {
         removeOwnerPreferences(owner);
         preferences.forEach(this::addOrUpdate);
@@ -254,8 +254,7 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
             DocumentReferenceResolver<String> documentReferenceResolver)
         {
             String owner = preference.getOwner();
-            if (StringUtils.isBlank(owner)
-                || !StringUtils.contains(owner, NotificationFilterPreference.DB_SPACE_SEP)) {
+            if (StringUtils.isBlank(owner) || !StringUtils.contains(owner, ':')) {
                 return null;
             }
             return documentReferenceResolver.resolve(owner);

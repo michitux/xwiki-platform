@@ -110,7 +110,8 @@ public class DefaultNotificationRecipientIndexManager implements NotificationRec
         this.indexes.clear();
     }
 
-    private void refreshOwner(String wikiId, String owner, List<? extends IndexableNotificationFilterPreference> preferences)
+    private void refreshOwner(String wikiId, String owner,
+        List<? extends IndexableNotificationFilterPreference> preferences)
     {
         DefaultNotificationRecipientIndex index = this.indexes.get(wikiId);
         if (index != null) {
@@ -126,7 +127,8 @@ public class DefaultNotificationRecipientIndexManager implements NotificationRec
         long afterInternalId = 0;
         while (true) {
             List<IndexableNotificationFilterPreference> batch =
-                this.notificationFilterPreferenceStore.loadIndexablePreferencesBatch(wikiId, afterInternalId, BATCH_SIZE);
+                this.notificationFilterPreferenceStore.loadIndexablePreferencesBatch(wikiId, afterInternalId,
+                    BATCH_SIZE);
             if (batch.isEmpty()) {
                 break;
             }
