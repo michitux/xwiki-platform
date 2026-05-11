@@ -135,6 +135,25 @@ class DefaultNotificationRecipientIndexTest
         assertTrue(this.index.findCandidates(newEvent).isEmpty());
     }
 
+    @Test
+    void pageScopeOnSpaceUsesAncestorSpaceKeys()
+    {
+        DocumentReference owner = new DocumentReference("xwiki", "XWiki", "SpaceWatcher");
+        DocumentReference pageReference = new DocumentReference("xwiki", "Space", "Page");
+        Event event = mock(Event.class);
+
+        when(this.documentReferenceResolver.resolve("xwiki:XWiki.SpaceWatcher")).thenReturn(owner);
+        when(this.entityReferenceSerializer.serialize(pageReference)).thenReturn(PAGE_REFERENCE);
+        when(this.entityReferenceSerializer.serialize(pageReference.getLastSpaceReference())).thenReturn(SPACE_REFERENCE);
+        when(event.getWiki()).thenReturn(new WikiReference("xwiki"));
+        when(event.getDocument()).thenReturn(pageReference);
+
+        this.index.addOrUpdate(createScopePreference("NFP_5", "xwiki:XWiki.SpaceWatcher", null, SPACE_REFERENCE, null,
+            Set.of()));
+
+        assertEquals(Set.of(owner), this.index.findCandidates(event));
+    }
+
     private DefaultNotificationFilterPreference createScopePreference(String preferenceId, String owner, String pageOnly,
         String page, String wiki, Set<String> eventTypes)
     {

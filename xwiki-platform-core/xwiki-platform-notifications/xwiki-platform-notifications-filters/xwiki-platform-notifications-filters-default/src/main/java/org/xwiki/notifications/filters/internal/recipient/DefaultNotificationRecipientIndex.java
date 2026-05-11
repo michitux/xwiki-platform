@@ -60,8 +60,6 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
 
     private final Map<String, Map<String, Set<DocumentReference>>> pageIndex = new HashMap<>();
 
-    private final Map<String, Map<String, Set<DocumentReference>>> spaceIndex = new HashMap<>();
-
     private final Map<String, Map<String, Set<DocumentReference>>> wikiIndex = new HashMap<>();
 
     private final Map<String, Set<DocumentReference>> followedUserIndex = new HashMap<>();
@@ -93,8 +91,7 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
         this.indexedPreferences.put(indexedPreference.getPreferenceId(), indexedPreference);
         this.indexedPreferencesByOwner.computeIfAbsent(indexedPreference.getOwnerKey(), ignored -> new HashSet<>())
             .add(indexedPreference.getPreferenceId());
-        indexedPreference.addToIndexes(this.pageOnlyIndex, this.pageIndex, this.spaceIndex, this.wikiIndex,
-            this.followedUserIndex);
+        indexedPreference.addToIndexes(this.pageOnlyIndex, this.pageIndex, this.wikiIndex, this.followedUserIndex);
     }
 
     synchronized void remove(String preferenceId)
@@ -127,7 +124,6 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
 
             for (String spaceReference : getSpaceReferences(documentReference)) {
                 addCandidates(this.pageIndex, spaceReference, eventType, candidateUsers);
-                addCandidates(this.spaceIndex, spaceReference, eventType, candidateUsers);
             }
         }
 
@@ -162,8 +158,7 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
             return;
         }
 
-        indexedPreference.removeFromIndexes(this.pageOnlyIndex, this.pageIndex, this.spaceIndex, this.wikiIndex,
-            this.followedUserIndex);
+        indexedPreference.removeFromIndexes(this.pageOnlyIndex, this.pageIndex, this.wikiIndex, this.followedUserIndex);
 
         Set<String> ownerPreferences = this.indexedPreferencesByOwner.get(indexedPreference.getOwnerKey());
         if (ownerPreferences != null) {
@@ -305,7 +300,6 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
 
         private void addToIndexes(Map<String, Map<String, Set<DocumentReference>>> pageOnlyIndex,
             Map<String, Map<String, Set<DocumentReference>>> pageIndex,
-            Map<String, Map<String, Set<DocumentReference>>> spaceIndex,
             Map<String, Map<String, Set<DocumentReference>>> wikiIndex,
             Map<String, Set<DocumentReference>> followedUserIndex)
         {
@@ -314,8 +308,7 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
                 return;
             }
 
-            Map<String, Map<String, Set<DocumentReference>>> index =
-                getIndex(pageOnlyIndex, pageIndex, spaceIndex, wikiIndex);
+            Map<String, Map<String, Set<DocumentReference>>> index = getIndex(pageOnlyIndex, pageIndex, wikiIndex);
             Map<String, Set<DocumentReference>> eventTypeIndex = index.computeIfAbsent(this.key,
                 ignored -> new HashMap<>());
             for (String eventType : this.eventTypes) {
@@ -325,7 +318,6 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
 
         private void removeFromIndexes(Map<String, Map<String, Set<DocumentReference>>> pageOnlyIndex,
             Map<String, Map<String, Set<DocumentReference>>> pageIndex,
-            Map<String, Map<String, Set<DocumentReference>>> spaceIndex,
             Map<String, Map<String, Set<DocumentReference>>> wikiIndex,
             Map<String, Set<DocumentReference>> followedUserIndex)
         {
@@ -334,19 +326,17 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
                 return;
             }
 
-            removeFromLocationIndex(getIndex(pageOnlyIndex, pageIndex, spaceIndex, wikiIndex));
+            removeFromLocationIndex(getIndex(pageOnlyIndex, pageIndex, wikiIndex));
         }
 
         private Map<String, Map<String, Set<DocumentReference>>> getIndex(
             Map<String, Map<String, Set<DocumentReference>>> pageOnlyIndex,
             Map<String, Map<String, Set<DocumentReference>>> pageIndex,
-            Map<String, Map<String, Set<DocumentReference>>> spaceIndex,
             Map<String, Map<String, Set<DocumentReference>>> wikiIndex)
         {
             return switch (this.type) {
                 case PAGE_ONLY -> pageOnlyIndex;
                 case PAGE -> pageIndex;
-                case SPACE -> spaceIndex;
                 case WIKI -> wikiIndex;
                 case FOLLOWED_USER ->
                     throw new IllegalStateException(String.format("Unsupported location index type [%s].", this.type));
@@ -399,7 +389,6 @@ public class DefaultNotificationRecipientIndex implements NotificationRecipientI
     {
         PAGE_ONLY,
         PAGE,
-        SPACE,
         WIKI,
         FOLLOWED_USER
     }
