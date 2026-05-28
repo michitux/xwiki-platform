@@ -22,6 +22,7 @@ package org.xwiki.rendering.internal.macro.jexl;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import javax.script.Bindings;
 import javax.script.ScriptContext;
