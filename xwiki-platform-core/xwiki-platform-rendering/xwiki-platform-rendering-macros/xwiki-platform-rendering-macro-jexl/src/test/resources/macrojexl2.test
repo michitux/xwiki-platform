@@ -1,0 +1,23 @@
+.runTransformations
+.#-----------------------------------------------------
+.input|xwiki/2.0
+.#-----------------------------------------------------
+{{velocity output="false"}}
+#set($var = 'fromvelocity')
+{{/velocity}}
+
+{{jexl}}
+var
+{{/jexl}}
+.#-----------------------------------------------------
+.expect|event/1.0
+.#-----------------------------------------------------
+beginDocument
+beginMacroMarkerStandalone [velocity] [output=false] [#set($var = 'fromvelocity')]
+endMacroMarkerStandalone [velocity] [output=false] [#set($var = 'fromvelocity')]
+beginMacroMarkerStandalone [jexl] [] [var]
+beginParagraph
+onWord [fromvelocity]
+endParagraph
+endMacroMarkerStandalone [jexl] [] [var]
+endDocument

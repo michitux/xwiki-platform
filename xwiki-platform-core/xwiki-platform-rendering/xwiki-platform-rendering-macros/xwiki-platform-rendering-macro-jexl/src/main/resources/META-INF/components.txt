@@ -1,0 +1,3 @@
+org.xwiki.rendering.internal.macro.jexl.DefaultJexlEngineManager
+org.xwiki.rendering.internal.macro.jexl.JexlMacro
+org.xwiki.rendering.internal.macro.jexl.JexlMacroPermissionPolicy

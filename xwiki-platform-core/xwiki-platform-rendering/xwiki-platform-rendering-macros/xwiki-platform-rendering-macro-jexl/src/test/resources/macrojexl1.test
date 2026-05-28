@@ -1,0 +1,46 @@
+.runTransformations
+.#-----------------------------------------------------
+.input|xwiki/2.0
+.#-----------------------------------------------------
+{{jexl}}
+#pragma jexl.import java.util
+let list = new ArrayList();
+list.add('one');
+list.add('two');
+let result = '';
+for (item : list) {
+  result += '* ' + item + '\n';
+}
+result
+{{/jexl}}
+.#-----------------------------------------------------
+.expect|event/1.0
+.#-----------------------------------------------------
+beginDocument
+beginMacroMarkerStandalone [jexl] [] [#pragma jexl.import java.util
+let list = new ArrayList();
+list.add('one');
+list.add('two');
+let result = '';
+for (item : list) {
+  result += '* ' + item + '\n';
+}
+result]
+beginList [BULLETED]
+beginListItem
+onWord [one]
+endListItem
+beginListItem
+onWord [two]
+endListItem
+endList [BULLETED]
+endMacroMarkerStandalone [jexl] [] [#pragma jexl.import java.util
+let list = new ArrayList();
+list.add('one');
+list.add('two');
+let result = '';
+for (item : list) {
+  result += '* ' + item + '\n';
+}
+result]
+endDocument

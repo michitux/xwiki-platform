@@ -1,0 +1,23 @@
+.runTransformations
+.#-----------------------------------------------------
+.input|xwiki/2.0
+.#-----------------------------------------------------
+{{jexl output="false"}}
+shared = 'fromjexl'
+{{/jexl}}
+
+{{velocity}}
+$shared
+{{/velocity}}
+.#-----------------------------------------------------
+.expect|event/1.0
+.#-----------------------------------------------------
+beginDocument
+beginMacroMarkerStandalone [jexl] [output=false] [shared = 'fromjexl']
+endMacroMarkerStandalone [jexl] [output=false] [shared = 'fromjexl']
+beginMacroMarkerStandalone [velocity] [] [$shared]
+beginParagraph
+onWord [fromjexl]
+endParagraph
+endMacroMarkerStandalone [velocity] [] [$shared]
+endDocument
