@@ -19,6 +19,11 @@
  */
 package org.xwiki.rendering.macro.jexl;
 
+import java.io.File;
+
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.xwiki.environment.Environment;
+import org.xwiki.environment.internal.StandardEnvironment;
 import javax.script.ScriptContext;
 import javax.script.SimpleScriptContext;
 
@@ -28,6 +33,8 @@ import org.xwiki.rendering.test.integration.Scope;
 import org.xwiki.rendering.test.integration.junit5.RenderingTest;
 import org.xwiki.script.ScriptContextManager;
 import org.xwiki.test.annotation.AllComponents;
+import org.xwiki.test.junit5.XWikiTempDir;
+import org.xwiki.test.junit5.XWikiTempDirExtension;
 import org.xwiki.test.mockito.MockitoComponentManager;
 
 import static org.mockito.Mockito.when;
@@ -38,9 +45,13 @@ import static org.mockito.Mockito.when;
  * @version $Id$
  */
 @AllComponents
+@ExtendWith(XWikiTempDirExtension.class)
 @Scope(pattern = "macrojexl.*")
 public class IntegrationTests extends RenderingTest
 {
+    @XWikiTempDir
+    private File permanentDir;
+
     @Initialized
     public void initialize(MockitoComponentManager componentManager) throws Exception
     {
@@ -50,5 +61,8 @@ public class IntegrationTests extends RenderingTest
         SimpleScriptContext scriptContext = new SimpleScriptContext();
         scriptContext.setAttribute("var", "value", ScriptContext.ENGINE_SCOPE);
         when(scriptContextManager.getScriptContext()).thenReturn(scriptContext);
+
+        StandardEnvironment environment = componentManager.getInstance(Environment.class);
+        environment.setPermanentDirectory(this.permanentDir);
     }
 }

@@ -3,21 +3,21 @@
 .input|xwiki/2.0
 .#-----------------------------------------------------
 {{velocity output="false"}}
-#set($var = 'fromvelocity')
+#set($velocityVar = 'fromvelocity')
 {{/velocity}}
 
 {{jexl}}
-var
+velocityVar
 {{/jexl}}
 .#-----------------------------------------------------
 .expect|event/1.0
 .#-----------------------------------------------------
 beginDocument
-beginMacroMarkerStandalone [velocity] [output=false] [#set($var = 'fromvelocity')]
-endMacroMarkerStandalone [velocity] [output=false] [#set($var = 'fromvelocity')]
-beginMacroMarkerStandalone [jexl] [] [var]
+beginMacroMarkerStandalone [velocity] [output=false] [#set($velocityVar = 'fromvelocity')]
+endMacroMarkerStandalone [velocity] [output=false] [#set($velocityVar = 'fromvelocity')]
+beginMacroMarkerStandalone [jexl] [] [velocityVar]
 beginParagraph
 onWord [fromvelocity]
 endParagraph
-endMacroMarkerStandalone [jexl] [] [var]
+endMacroMarkerStandalone [jexl] [] [velocityVar]
 endDocument

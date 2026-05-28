@@ -56,6 +56,8 @@ import org.xwiki.rendering.macro.jexl.JexlEngineManager;
 @Singleton
 public class DefaultJexlEngineManager implements JexlEngineManager, Initializable
 {
+    private static final Set<Class<?>> STATIC_ACCESS_ALLOWLIST = Set.of(Arrays.class, Collections.class, Math.class);
+
     static final Map<String, Object> STATIC_NAMESPACES = Map.of(
         "arrays", Arrays.class,
         "collections", Collections.class,
@@ -82,7 +84,7 @@ public class DefaultJexlEngineManager implements JexlEngineManager, Initializabl
             .strict(true)
             .safe(false)
             .namespaces(STATIC_NAMESPACES)
-            .permissions(new VelocityLikeJexlPermissions(CONSTRUCTOR_ALLOWLIST, Set.copyOf(STATIC_NAMESPACES.values())))
+            .permissions(new VelocityLikeJexlPermissions(CONSTRUCTOR_ALLOWLIST, STATIC_ACCESS_ALLOWLIST))
             .create();
     }
 

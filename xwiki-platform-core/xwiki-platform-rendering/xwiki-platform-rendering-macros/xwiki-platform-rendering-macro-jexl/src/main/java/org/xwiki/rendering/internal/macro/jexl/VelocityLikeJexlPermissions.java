@@ -106,8 +106,8 @@ class VelocityLikeJexlPermissions extends JexlPermissions.Delegate
             "tourl"));
 
     private static final List<RestrictedMethod> RESTRICTED_METHODS = List.of(
-        new RestrictedMethod(org.apache.velocity.app.VelocityEngine.class, "init"),
-        new RestrictedMethod(org.apache.velocity.app.VelocityEngine.class, "reset"));
+        new RestrictedMethod("org.apache.velocity.app.VelocityEngine", "init"),
+        new RestrictedMethod("org.apache.velocity.app.VelocityEngine", "reset"));
 
     private final Set<Class<?>> constructorAllowlist;
 
@@ -150,32 +150,22 @@ class VelocityLikeJexlPermissions extends JexlPermissions.Delegate
     @Override
     public boolean allow(Field field)
     {
-        return validate(field) && allow(field.getDeclaringClass(), field);
-    }
-
-    @Override
-    public boolean allow(Class<?> clazz, Field field)
-    {
+        Class<?> clazz = field.getDeclaringClass();
         if (!validate(field) || !allow(clazz)) {
             return false;
         }
 
         if (Modifier.isStatic(field.getModifiers())) {
-            return this.staticAccessAllowlist.contains(clazz) && super.allow(clazz, field);
+            return this.staticAccessAllowlist.contains(clazz) && super.allow(field);
         }
 
-        return findMethodAllowlist(clazz) == null && !isRestrictedClass(clazz) && super.allow(clazz, field);
+        return findMethodAllowlist(clazz) == null && !isRestrictedClass(clazz) && super.allow(field);
     }
 
     @Override
     public boolean allow(Method method)
     {
-        return validate(method) && allow(method.getDeclaringClass(), method);
-    }
-
-    @Override
-    public boolean allow(Class<?> clazz, Method method)
-    {
+        Class<?> clazz = method.getDeclaringClass();
         if (!validate(method) || !allow(clazz)) {
             return false;
         }
@@ -195,10 +185,10 @@ class VelocityLikeJexlPermissions extends JexlPermissions.Delegate
         }
 
         if (Modifier.isStatic(method.getModifiers())) {
-            return this.staticAccessAllowlist.contains(clazz) && super.allow(clazz, method);
+            return this.staticAccessAllowlist.contains(clazz) && super.allow(method);
         }
 
-        return !isRestrictedClass(clazz) && super.allow(clazz, method);
+        return !isRestrictedClass(clazz) && super.allow(method);
     }
 
     private Set<String> findMethodAllowlist(Class<?> clazz)
@@ -237,7 +227,7 @@ class VelocityLikeJexlPermissions extends JexlPermissions.Delegate
     {
         for (RestrictedMethod restrictedMethod : RESTRICTED_METHODS) {
             if (restrictedMethod.methodName.equals(methodName)
-                && restrictedMethod.declaringClass.isAssignableFrom(clazz)) {
+                && restrictedMethod.declaringClass.equals(clazz.getName())) {
                 return true;
             }
         }
@@ -247,11 +237,11 @@ class VelocityLikeJexlPermissions extends JexlPermissions.Delegate
 
     private static final class RestrictedMethod
     {
-        private final Class<?> declaringClass;
+        private final String declaringClass;
 
         private final String methodName;
 
-        private RestrictedMethod(Class<?> declaringClass, String methodName)
+        private RestrictedMethod(String declaringClass, String methodName)
         {
             this.declaringClass = declaringClass;
             this.methodName = methodName;

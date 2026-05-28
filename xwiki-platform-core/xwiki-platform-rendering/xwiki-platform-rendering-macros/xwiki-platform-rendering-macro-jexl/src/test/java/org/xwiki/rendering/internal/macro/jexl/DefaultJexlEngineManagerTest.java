@@ -20,11 +20,8 @@
 package org.xwiki.rendering.internal.macro.jexl;
 
 import java.io.File;
-import java.util.AbstractMap;
-import java.util.Collection;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 
 import javax.script.Bindings;
 import javax.script.ScriptContext;
@@ -125,7 +122,7 @@ class DefaultJexlEngineManagerTest
     void benchmarkManyExpressionsWithSharedContextWithoutCopyingBindings()
     {
         SimpleScriptContext scriptContext = new SimpleScriptContext();
-        scriptContext.setBindings(new NoIterationBindings(Map.of("base", 40)), ScriptContext.ENGINE_SCOPE);
+        scriptContext.setBindings(new NoIterationBindings(new HashMap<>(Map.of("base", 40))), ScriptContext.ENGINE_SCOPE);
         JexlContext context = this.manager.createContext(scriptContext);
         JexlExpression expression = this.manager.createExpression("base + offset");
 
