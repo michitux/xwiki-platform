@@ -1,0 +1,49 @@
+.runTransformations
+.#-----------------------------------------------------
+.input|xwiki/2.0
+.#-----------------------------------------------------
+{{jexltemplate}}
+<script>
+{
+  'show': true,
+  'users': ['Alice', 'Bob']
+}
+</script>
+<v-fragment name="row"><li v-text="user" /></v-fragment>
+<ul v-if="template.show">
+  <v-render fragment="row" v-for="user in template.users" />
+</ul>
+{{/jexltemplate}}
+.#-----------------------------------------------------
+.expect|event/1.0
+.#-----------------------------------------------------
+beginDocument
+beginMacroMarkerStandalone [jexltemplate] [] [<script>
+{
+  'show': true,
+  'users': ['Alice', 'Bob']
+}
+</script>
+<v-fragment name="row"><li v-text="user" /></v-fragment>
+<ul v-if="template.show">
+  <v-render fragment="row" v-for="user in template.users" />
+</ul>]
+beginList [BULLETED]
+beginListItem
+onWord [Alice]
+endListItem
+beginListItem
+onWord [Bob]
+endListItem
+endList [BULLETED]
+endMacroMarkerStandalone [jexltemplate] [] [<script>
+{
+  'show': true,
+  'users': ['Alice', 'Bob']
+}
+</script>
+<v-fragment name="row"><li v-text="user" /></v-fragment>
+<ul v-if="template.show">
+  <v-render fragment="row" v-for="user in template.users" />
+</ul>]
+endDocument

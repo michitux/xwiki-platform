@@ -1,0 +1,36 @@
+.runTransformations
+.#-----------------------------------------------------
+.input|xwiki/2.0
+.#-----------------------------------------------------
+{{jexltemplate}}
+<script>
+{
+  'disabled': true,
+  'logo': 'attach:logo.png'
+}
+</script>
+<button :disabled="template.disabled">Click</button><xw-img v-bind:src="template.logo" alt="Logo" />
+{{/jexltemplate}}
+.#-----------------------------------------------------
+.expect|event/1.0
+.#-----------------------------------------------------
+beginDocument
+beginMacroMarkerStandalone [jexltemplate] [] [<script>
+{
+  'disabled': true,
+  'logo': 'attach:logo.png'
+}
+</script>
+<button :disabled="template.disabled">Click</button><xw-img v-bind:src="template.logo" alt="Logo" />]
+onRawText [<button disabled="">] [html/5.0]
+onWord [Click]
+onRawText [</button>] [html/5.0]
+onImage [Typed = [true] Type = [attach] Reference = [logo.png]] [false] [[alt]=[Logo]]
+endMacroMarkerStandalone [jexltemplate] [] [<script>
+{
+  'disabled': true,
+  'logo': 'attach:logo.png'
+}
+</script>
+<button :disabled="template.disabled">Click</button><xw-img v-bind:src="template.logo" alt="Logo" />]
+endDocument

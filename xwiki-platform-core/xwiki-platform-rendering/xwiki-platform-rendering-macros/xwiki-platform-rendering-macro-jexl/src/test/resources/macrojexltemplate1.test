@@ -1,0 +1,43 @@
+.runTransformations
+.#-----------------------------------------------------
+.input|xwiki/2.0
+.#-----------------------------------------------------
+{{jexltemplate}}
+<script>
+{
+  'items': ['one', 'two']
+}
+</script>
+<ul>
+  <li v-for="item in template.items" v-text="item" />
+</ul>
+{{/jexltemplate}}
+.#-----------------------------------------------------
+.expect|event/1.0
+.#-----------------------------------------------------
+beginDocument
+beginMacroMarkerStandalone [jexltemplate] [] [<script>
+{
+  'items': ['one', 'two']
+}
+</script>
+<ul>
+  <li v-for="item in template.items" v-text="item" />
+</ul>]
+beginList [BULLETED]
+beginListItem
+onWord [one]
+endListItem
+beginListItem
+onWord [two]
+endListItem
+endList [BULLETED]
+endMacroMarkerStandalone [jexltemplate] [] [<script>
+{
+  'items': ['one', 'two']
+}
+</script>
+<ul>
+  <li v-for="item in template.items" v-text="item" />
+</ul>]
+endDocument
