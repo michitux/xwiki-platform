@@ -28,7 +28,7 @@ import org.xwiki.properties.BeanDescriptor;
 import org.xwiki.properties.BeanManager;
 import org.xwiki.rendering.block.MacroBlock;
 import org.xwiki.rendering.internal.macro.jexl.JexlTemplateMacro;
-import org.xwiki.rendering.internal.macro.jexl.JexlMacroPermissionPolicy;
+import org.xwiki.rendering.internal.macro.jexl.JexlTemplateMacroPermissionPolicy;
 import org.xwiki.rendering.internal.macro.script.PermissionCheckerListener;
 import org.xwiki.rendering.macro.Macro;
 import org.xwiki.rendering.macro.MacroExecutionException;
@@ -53,7 +53,7 @@ import static org.mockito.Mockito.when;
  * Verify that a JEXL template macro's execution can be restricted.
  */
 @ComponentTest
-@ComponentList({JexlMacroPermissionPolicy.class, DefaultObservationManager.class, PermissionCheckerListener.class})
+@ComponentList({JexlTemplateMacroPermissionPolicy.class, DefaultObservationManager.class, PermissionCheckerListener.class})
 class JexlTemplateMacroSecurityTest
 {
     @MockComponent

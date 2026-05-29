@@ -118,7 +118,7 @@ public class JexlTemplateMacro extends AbstractScriptMacro<ScriptMacroParameters
      */
     public JexlTemplateMacro()
     {
-        super("JEXL Template", DESCRIPTION, new DefaultContentDescriptor(CONTENT_DESCRIPTION),
+        super("jexltemplate", DESCRIPTION, new DefaultContentDescriptor(CONTENT_DESCRIPTION),
             ScriptMacroParameters.class);
     }
 
