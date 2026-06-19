@@ -113,6 +113,21 @@
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
+    <!-- Used to serve the maven test extension repository over HTTP (with basic auth) from a container reachable by
+         XWiki, since XWiki runs in a container and can't access the maven repository on the host filesystem (in
+         particular in the DOOD setup used on the CI). -->
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-nginx</artifactId>
+      <version>${testcontainers.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- Used to generate the htpasswd file (apr1) configuring the basic auth of the maven test repository. -->
+    <dependency>
+      <groupId>commons-codec</groupId>
+      <artifactId>commons-codec</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
   <build>
     <testSourceDirectory>src/test/it</testSourceDirectory>
