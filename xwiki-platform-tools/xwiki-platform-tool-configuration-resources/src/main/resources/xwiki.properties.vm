@@ -250,6 +250,66 @@ environment.permanentDirectory = $xwikiPropertiesEnvironmentPermanentDirectory
 # rendering.recursion.macro.inclusion.limit = 1
 
 #-------------------------------------------------------------------------------------
+# Rendering Limits
+#-------------------------------------------------------------------------------------
+
+#-# [Since 18.7.0RC1]
+#-# In addition to the recursion limits above, every rendering has budgets for the resources it may consume in total, to
+#-# protect the server against content that consumes a lot of memory or processing time. Each of them is configured
+#-# through a property of the following form, where <type> is one of the types listed below:
+#-#
+#-#   rendering.limits.<type>.limit = <maximum amount>
+#-#
+#-# Unlike the recursion limits, these are budgets: the amount charged against them only increases while the rendering
+#-# lasts. When a budget is exhausted, no further macro is executed in that rendering and an error is displayed in the
+#-# place of the macro that would have been executed next. Every exhausted budget is also logged with the page that
+#-# exhausted it.
+#-#
+#-# Note that one rendering isn't the same as one request: displaying a page performs several independent renderings, for
+#-# instance one for its content, one for its title and one for each panel, and each of them gets its own budgets.
+#-# Everything a rendering triggers shares its budgets, though, in particular the include and display macros, nested
+#-# transformations like the HTML macro with wiki="true" and asynchronous executions, so content cannot obtain fresh
+#-# budgets for itself.
+#-#
+#-# The amounts are deliberately rough: content that passes through several macros is counted several times, for
+#-# instance, so the defaults are set generously rather than trying to be accurate.
+
+#-# [Since 18.7.0RC1]
+#-# How the budgets are applied:
+#-# - enforce: stop executing macros once a budget is exhausted.
+#-# - log: only log the exhausted budgets without ever refusing anything, which is the mode to use for finding out
+#-#   which limits a wiki needs before enforcing them.
+#-# - disabled: don't count anything.
+#-# Note that it doesn't apply to the recursion limits above: those protect against stack overflows, which cannot
+#-# sensibly be turned into a warning.
+#-#
+#-# The default is:
+# rendering.limits.mode = enforce
+
+#-# [Since 18.7.0RC1]
+#-# The maximum number of macros that may be executed in one rendering. This is intentionally high, it is a backstop
+#-# against content that generates macros without end rather than a limit that legitimate content is expected to come
+#-# close to.
+#-#
+#-# The default is:
+# rendering.limits.macro.executions.limit = 100000
+
+#-# [Since 18.7.0RC1]
+#-# The maximum time, in milliseconds, that one rendering may take. It is checked between two macro executions, so a
+#-# single macro that never returns isn't caught by it, and it is the sum of the time of the rendering and of the
+#-# asynchronous executions it spawns.
+#-#
+#-# The default is:
+# rendering.limits.time.limit = 60000
+
+#-# [Since 18.7.0RC1]
+#-# The maximum number of error messages that may be inserted by one rendering, so that content with a lot of failing
+#-# macros doesn't produce a huge result made of error messages.
+#-#
+#-# The default is:
+# rendering.limits.error.messages.limit = 100
+
+#-------------------------------------------------------------------------------------
 # Rendering Transformations
 #-------------------------------------------------------------------------------------
 

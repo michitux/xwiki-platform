@@ -165,6 +165,9 @@ public class PDFExportJob extends AbstractPDFExportJob
         // TODO: Don't render the same document twice.
         // TODO: Collect the XDOMs only when the table of content is requested.
         // TODO: Keep only the headings in the collected XDOMs in order to reduce the memory footprint.
+        // Note that each exported document gets its own rendering budgets even though they all share this job's
+        // execution context: this job runs at transformation depth zero, so every document starts an outermost
+        // transformation. The export as a whole is bounded by the maximum content size instead, see the caller.
         DocumentRenderingResult renderingResult = this.documentRenderer.render(documentReference, rendererParameters);
         this.status.getDocumentRenderingResults().add(renderingResult);
 

@@ -97,14 +97,17 @@ public class AsyncRendererJobRequest extends AbstractRequest
 
     /**
      * The state of the rendering limits when this job was requested, i.e. the recursion depths that were already
-     * reached, so that executing content asynchronously cannot be used to get fresh limits.
+     * reached and the budgets that are being consumed, so that executing content asynchronously cannot be used to get
+     * fresh limits.
      * <p>
      * Note that this is deliberately not propagated through the {@link org.xwiki.context.ContextStore} like the rest
      * of the context: every context store entry ends up in the job id, and thus in the cache key and in the URL used
-     * to fetch the result, so a value that changes with the recursion depth would fragment the asynchronous renderer
-     * cache.
+     * to fetch the result, so a value that changes with the recursion depth or with the consumed budget would fragment
+     * the asynchronous renderer cache.
      * <p>
-     * It is cleared once the job has taken it over so that a cached job status doesn't keep it alive.
+     * As the job is shared when a second client attaches to an already running job, the job charges the budgets of the
+     * client that requested it first. It is cleared once the job has taken it over so that a cached job status doesn't
+     * keep the budgets of a rendering alive.
      *
      * @return the limits to continue in the job's execution context, may be {@code null}
      * @since 18.7.0RC1

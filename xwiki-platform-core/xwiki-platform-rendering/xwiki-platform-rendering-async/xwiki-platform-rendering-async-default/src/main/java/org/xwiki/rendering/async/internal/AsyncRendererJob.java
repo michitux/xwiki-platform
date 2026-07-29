@@ -80,7 +80,7 @@ public class AsyncRendererJob extends AbstractJob<AsyncRendererJobRequest, Async
         // Continue the limits of the execution that spawned this job instead of starting with fresh ones. This job
         // runs in its own, fresh execution context, so the limits have to be restored explicitly.
         this.renderingLimits.restore(getRequest().getRenderingLimitsSnapshot());
-        // Stop referencing the snapshot from the request as it is kept in the status that is put into the cache.
+        // Stop referencing the budgets from the request as it is kept in the status that is put into the cache.
         getRequest().setRenderingLimitsSnapshot(null);
 
         // Enable async execution only if cache is disabled as otherwise we could end up with place holders not
