@@ -53,6 +53,7 @@ import org.xwiki.rendering.RenderingException;
 import org.xwiki.rendering.async.AsyncContext;
 import org.xwiki.rendering.async.AsyncContextHandler;
 import org.xwiki.rendering.async.internal.DefaultAsyncContext.ContextUse;
+import org.xwiki.rendering.limits.RenderingLimitType;
 import org.xwiki.rendering.limits.RenderingLimits;
 import org.xwiki.security.authorization.AuthorExecutor;
 
@@ -205,6 +206,17 @@ public class DefaultAsyncRendererExecutor implements AsyncRendererExecutor
         request.setJobGroupPath(renderer.getJobGroupPath());
 
         if (asyncAllowed) {
+            // Charge the execution that is about to be spawned. This is checked here and not where asyncAllowed is
+            // computed so that a cached result, which spawns nothing, isn't charged, and it is deliberately
+            // independent of AsyncRendererConfiguration#isPlaceHolderForced so that forcing a placeholder cannot be
+            // used to bypass the limit. Falling back to a synchronous execution rather than reporting an error means
+            // that the page is still rendered, and that a chain of nested asynchronous executions ends up being
+            // bounded by the transformation recursion limit.
+            this.renderingLimits.charge(RenderingLimitType.ASYNC_EXECUTIONS, 1);
+            asyncAllowed = !this.renderingLimits.isExceeded(RenderingLimitType.ASYNC_EXECUTIONS);
+        }
+
+        if (asyncAllowed) {
             this.cache.getLock().writeLock().lock();
 
             try {
@@ -221,9 +233,10 @@ public class DefaultAsyncRendererExecutor implements AsyncRendererExecutor
 
                 request.setId(jobId);
 
-                // Carry the limits over to the job so that an asynchronous execution continues the recursion depths of
-                // the execution it spawned from instead of starting with fresh ones. This is only set once the
-                // execution is really going to happen as the request ends up in the cache.
+                // Carry the limits over to the job so that an asynchronous execution continues the recursion depths
+                // and the budgets of the execution it spawned from instead of starting with fresh ones. This is only
+                // set once the execution is really going to happen as the request ends up in the cache, which must not
+                // keep the budgets of a rendering alive.
                 request.setRenderingLimitsSnapshot(this.renderingLimits.save());
 
                 Job job = this.executor.execute(AsyncRendererJobStatus.JOBTYPE, request);

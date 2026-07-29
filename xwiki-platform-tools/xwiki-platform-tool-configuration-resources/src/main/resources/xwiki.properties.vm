@@ -311,6 +311,13 @@ environment.permanentDirectory = $xwikiPropertiesEnvironmentPermanentDirectory
 # rendering.limits.time.limit = 60000
 
 #-# [Since 18.7.0RC1]
+#-# The maximum number of asynchronous executions that one rendering may spawn. Any further asynchronous execution is
+#-# executed synchronously instead, so that the page is still rendered.
+#-#
+#-# The default is:
+# rendering.limits.async.executions.limit = 100
+
+#-# [Since 18.7.0RC1]
 #-# The maximum number of error messages that may be inserted by one rendering, so that content with a lot of failing
 #-# macros doesn't produce a huge result made of error messages.
 #-#

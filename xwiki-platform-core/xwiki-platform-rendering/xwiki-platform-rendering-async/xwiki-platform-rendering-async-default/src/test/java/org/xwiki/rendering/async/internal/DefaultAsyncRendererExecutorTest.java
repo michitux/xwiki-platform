@@ -22,6 +22,7 @@ package org.xwiki.rendering.async.internal;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -32,6 +33,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.xwiki.bridge.DocumentAccessBridge;
+import org.xwiki.cache.CacheControl;
 import org.xwiki.component.manager.ComponentLookupException;
 import org.xwiki.context.concurrent.ContextStoreManager;
 import org.xwiki.job.JobException;
@@ -40,6 +42,7 @@ import org.xwiki.job.JobGroupPath;
 import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.rendering.RenderingException;
 import org.xwiki.rendering.async.AsyncContext;
+import org.xwiki.rendering.limits.RenderingLimitType;
 import org.xwiki.rendering.limits.RenderingLimits;
 import org.xwiki.rendering.limits.RenderingLimitsSnapshot;
 import org.xwiki.test.junit5.mockito.ComponentTest;
@@ -52,6 +55,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -91,6 +95,9 @@ class DefaultAsyncRendererExecutorTest
 
     @MockComponent
     private RenderingLimits renderingLimits;
+
+    @MockComponent
+    private CacheControl cacheControl;
 
     @InjectMockComponents
     private DefaultAsyncRendererExecutor executor;
@@ -290,7 +297,7 @@ class DefaultAsyncRendererExecutorTest
     }
 
     @Test
-    void theLimitsAreHandedOverToTheJob() throws Exception
+    void spawningAnAsynchronousExecutionIsCharged() throws Exception
     {
         when(this.asyncContext.isEnabled()).thenReturn(true);
         when(this.renderer.isAsyncAllowed()).thenReturn(true);
@@ -301,8 +308,60 @@ class DefaultAsyncRendererExecutorTest
         AsyncRendererExecutorResponse response = this.executor.render(this.renderer, this.configuration);
 
         assertNotNull(response.getAsyncClientId());
+        verify(this.renderingLimits).charge(RenderingLimitType.ASYNC_EXECUTIONS, 1);
         // The job continues the limits of this execution instead of starting with fresh ones.
         assertSame(snapshot,
             ((AsyncRendererJobRequest) response.getStatus().getRequest()).getRenderingLimitsSnapshot());
+    }
+
+    @Test
+    void exhaustedAsynchronousExecutionsFallBackToSynchronousRendering() throws Exception
+    {
+        when(this.asyncContext.isEnabled()).thenReturn(true);
+        when(this.renderer.isAsyncAllowed()).thenReturn(true);
+        when(this.renderer.isCacheAllowed()).thenReturn(true);
+        when(this.renderingLimits.isExceeded(RenderingLimitType.ASYNC_EXECUTIONS)).thenReturn(true);
+        when(this.renderingLimits.save()).thenReturn(mock());
+
+        AsyncRendererExecutorResponse response = this.executor.render(this.renderer, this.configuration);
+
+        // No asynchronous job has been started, the renderer has been executed synchronously instead.
+        assertNull(response.getAsyncClientId());
+        assertEquals("false true", response.getStatus().getResult().getResult());
+        verify(this.jobs, never()).execute(same(AsyncRendererJobStatus.JOBTYPE), any(AsyncRendererJobRequest.class));
+        // The status is cached, so it must not keep the budgets of this rendering alive.
+        assertNull(((AsyncRendererJobRequest) response.getStatus().getRequest()).getRenderingLimitsSnapshot());
+    }
+
+    @Test
+    void forcedPlaceHolderDoesNotBypassTheLimit() throws Exception
+    {
+        this.configuration.setPlaceHolderForced(true);
+        when(this.renderer.isCacheAllowed()).thenReturn(true);
+        when(this.renderingLimits.isExceeded(RenderingLimitType.ASYNC_EXECUTIONS)).thenReturn(true);
+
+        AsyncRendererExecutorResponse response = this.executor.render(this.renderer, this.configuration);
+
+        assertNull(response.getAsyncClientId());
+        verify(this.jobs, never()).execute(same(AsyncRendererJobStatus.JOBTYPE), any(AsyncRendererJobRequest.class));
+    }
+
+    @Test
+    void aCachedResultIsNotCharged() throws Exception
+    {
+        when(this.asyncContext.isEnabled()).thenReturn(true);
+        when(this.renderer.isAsyncAllowed()).thenReturn(true);
+        when(this.renderer.isCacheAllowed()).thenReturn(true);
+        when(this.renderer.getId()).thenReturn(Arrays.asList("1", "2"));
+
+        AsyncRendererJobStatus cachedStatus =
+            new AsyncRendererJobStatus(new AsyncRendererJobRequest(), new AsyncRendererResult("cached"));
+        when(this.cache.getSync(any())).thenReturn(cachedStatus);
+        when(this.cacheControl.isCacheReadAllowed(any(Date.class))).thenReturn(true);
+
+        AsyncRendererExecutorResponse response = this.executor.render(this.renderer, this.configuration);
+
+        assertEquals("cached", response.getStatus().getResult().getResult());
+        verify(this.renderingLimits, never()).charge(any(), anyLong());
     }
 }
