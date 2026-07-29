@@ -34,6 +34,8 @@ import org.xwiki.model.reference.EntityReferenceSerializer;
 import org.xwiki.rendering.async.internal.block.BlockAsyncRendererExecutor;
 import org.xwiki.rendering.block.Block;
 import org.xwiki.rendering.block.XDOM;
+import org.xwiki.rendering.internal.limits.DefaultRenderingLimits;
+import org.xwiki.rendering.internal.limits.RenderingLimitsConfiguration;
 import org.xwiki.rendering.listener.MetaData;
 import org.xwiki.rendering.transformation.TransformationContext;
 import org.xwiki.rendering.transformation.TransformationManager;
@@ -59,7 +61,8 @@ import static org.mockito.Mockito.when;
 @ComponentTest
 @ComponentList({
     DefaultDocumentContentAsyncParser.class,
-    DocumentReferenceDequeContext.class
+    DefaultRenderingLimits.class,
+    DocumentDisplayerRecursion.class
 })
 class DocumentContentDisplayerTest
 {
@@ -74,6 +77,9 @@ class DocumentContentDisplayerTest
 
     @MockComponent
     private BlockAsyncRendererExecutor executor;
+
+    @MockComponent
+    private RenderingLimitsConfiguration renderingLimitsConfiguration;
 
     @MockComponent
     private Execution execution;

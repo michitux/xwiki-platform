@@ -192,9 +192,62 @@ environment.permanentDirectory = $xwikiPropertiesEnvironmentPermanentDirectory
 #-# [Since 15.0RC1]
 #-# [Since 14.10.2]
 #-# The maximum size (in bytes) of attachment to allow as code macro source.
-#-# 
+#-#
 #-# The default is:
 # rendering.macro.code.source.attachmentMaximumSize = 1000000
+
+#-------------------------------------------------------------------------------------
+# Rendering Recursion Limits
+#-------------------------------------------------------------------------------------
+
+#-# [Since 18.7.0RC1]
+#-# Rendering can recurse in several unrelated ways: a macro can trigger a nested transformation of content that ends
+#-# up calling that same macro again, a page can include itself, a script in the title of a page can display the title
+#-# of that same page again, etc. Each of these has a maximum depth, both to protect the server against stack overflows
+#-# and to report an error instead of hanging when content executes itself recursively. The limits are independent from
+#-# each other and each of them is configured through a property of the following form, where <type> is one of the
+#-# types listed below:
+#-#
+#-#   rendering.recursion.<type>.limit = <maximum depth>
+#-#
+#-# When a limit is reached, the content that would exceed it isn't executed: an error is displayed in its place, except
+#-# for the title of a page, where the name of the page is displayed instead.
+#-#
+#-# Note that these are depth limits and not budgets for the rendering of a whole page: the depth of a type increases
+#-# when a level is entered and decreases again when it is left, so a page may contain any number of inclusions as long
+#-# as no page is included within itself. Asynchronous executions continue the depths of the execution that spawned
+#-# them, so executing content asynchronously doesn't grant it a fresh limit.
+#-#
+#-# Be careful when lowering these limits as this can break legitimate content, see the individual comments below.
+
+#-# [Since 18.7.0RC1]
+#-# The maximum depth of nested transformations, i.e. of macros that execute a transformation of content themselves,
+#-# like the HTML macro with wiki="true" or the async macro. This is not about nesting macros inside each other but
+#-# about macros that really trigger another transformation.
+#-#
+#-# The default is:
+# rendering.recursion.transformation.limit = 20
+
+#-# [Since 18.7.0RC1]
+#-# The maximum number of times the content of a single page may be displayed within itself. This needs to be at least
+#-# two for pages that are displayed through a sheet, as it is the case in App Within Minutes.
+#-#
+#-# The default is:
+# rendering.recursion.display.content.limit = 5
+
+#-# [Since 18.7.0RC1]
+#-# The maximum number of times the title of a single page may be displayed within itself, which happens for example
+#-# when the title of a page contains a script that displays the title of that same page.
+#-#
+#-# The default is:
+# rendering.recursion.display.title.limit = 1
+
+#-# [Since 18.7.0RC1]
+#-# The maximum number of times a single page may be included within itself. This is a single limit shared by the
+#-# include and the display macro, so that a cycle that alternates between the two macros is also caught.
+#-#
+#-# The default is:
+# rendering.recursion.macro.inclusion.limit = 1
 
 #-------------------------------------------------------------------------------------
 # Rendering Transformations

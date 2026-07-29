@@ -1,0 +1,51 @@
+.runTransformations
+.#-----------------------------------------------------
+.# The async macro executes its content in a nested transformation, also when async is disabled. Check that those
+.# nested transformations are counted against the transformation recursion limit (lowered to 3 in IntegrationTests), so
+.# that content which recursively executes itself through the async macro cannot overflow the stack. This is what
+.# stops a page including itself inside an async macro, as the fresh XDOM parsed by the async macro defeats the
+.# recursion protection of the include macro.
+.#-----------------------------------------------------
+.input|xwiki/2.0
+.#-----------------------------------------------------
+{{async async="false" cache="false"}}
+{{async async="false" cache="false"}}
+{{async async="false" cache="false"}}
+toto
+{{/async}}
+{{/async}}
+{{/async}}
+.#-----------------------------------------------------
+.expect|event/1.0
+.#-----------------------------------------------------
+beginDocument
+beginMacroMarkerStandalone [async] [async=false|cache=false] [{{async async="false" cache="false"}}
+{{async async="false" cache="false"}}
+toto
+{{/async}}
+{{/async}}]
+beginMetaData [[non-generated-content]=[java.util.List<org.xwiki.rendering.block.Block>]]
+beginMetaData [[syntax]=[XWiki 2.0]]
+beginMacroMarkerStandalone [async] [async=false|cache=false] [{{async async="false" cache="false"}}
+toto
+{{/async}}]
+beginMetaData [[non-generated-content]=[java.util.List<org.xwiki.rendering.block.Block>]]
+beginMetaData [[syntax]=[XWiki 2.0]]
+beginMacroMarkerStandalone [async] [async=false|cache=false] [toto]
+beginMetaData [[non-generated-content]=[java.util.List<org.xwiki.rendering.block.Block>]]
+onWord [error:RecursionLimitExceededException: The maximum recursion depth of [3] for [transformation] has been reached.]
+endMetaData [[non-generated-content]=[java.util.List<org.xwiki.rendering.block.Block>]]
+endMacroMarkerStandalone [async] [async=false|cache=false] [toto]
+endMetaData [[syntax]=[XWiki 2.0]]
+endMetaData [[non-generated-content]=[java.util.List<org.xwiki.rendering.block.Block>]]
+endMacroMarkerStandalone [async] [async=false|cache=false] [{{async async="false" cache="false"}}
+toto
+{{/async}}]
+endMetaData [[syntax]=[XWiki 2.0]]
+endMetaData [[non-generated-content]=[java.util.List<org.xwiki.rendering.block.Block>]]
+endMacroMarkerStandalone [async] [async=false|cache=false] [{{async async="false" cache="false"}}
+{{async async="false" cache="false"}}
+toto
+{{/async}}
+{{/async}}]
+endDocument

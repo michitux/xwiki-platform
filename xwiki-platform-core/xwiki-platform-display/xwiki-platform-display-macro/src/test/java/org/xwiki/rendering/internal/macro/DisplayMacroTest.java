@@ -59,6 +59,8 @@ import org.xwiki.rendering.macro.MacroExecutionException;
 import org.xwiki.rendering.macro.display.DisplayMacroParameters;
 import org.xwiki.rendering.parser.Parser;
 import org.xwiki.rendering.renderer.PrintRendererFactory;
+import org.xwiki.rendering.renderer.printer.DefaultWikiPrinter;
+import org.xwiki.rendering.renderer.printer.WikiPrinter;
 import org.xwiki.rendering.syntax.Syntax;
 import org.xwiki.rendering.test.integration.junit5.BlockAssert;
 import org.xwiki.rendering.transformation.MacroTransformationContext;
@@ -275,6 +277,20 @@ class DisplayMacroTest
         Throwable exception = assertThrows(MacroExecutionException.class,
             () -> this.displayMacro.execute(parameters, null, macroContext));
         assertEquals("Found recursive display of document [wiki:space.page]", exception.getMessage());
+    }
+
+    @Test
+    void executeWhenTheDisplayedDocumentDisplaysItself() throws Exception
+    {
+        // Unlike executeWithRecursiveDisplay, this doesn't mock the document displayer: the displayed document really
+        // contains a display macro pointing at itself, so the recursion is detected by the actual rendering pipeline.
+        List<Block> blocks = runDisplayMacro("{{display reference=\"wiki:space.page\"/}}");
+
+        String result = renderEvents(blocks);
+
+        // The nested display macro is replaced by an error block instead of recursing.
+        assertTrue(result.contains("Failed to execute the [display] macro."), result);
+        assertTrue(result.contains("Found recursive display of document [wiki:Space.DisplayedPage]"), result);
     }
 
     @Test
@@ -548,6 +564,14 @@ class DisplayMacroTest
     {
         Parser parser = this.componentManager.getInstance(Parser.class, "xwiki/2.0");
         return parser.parse(new StringReader(content));
+    }
+
+    private String renderEvents(List<Block> blocks)
+    {
+        WikiPrinter printer = new DefaultWikiPrinter();
+        new XDOM(blocks).traverse(this.rendererFactory.createRenderer(printer));
+
+        return printer.toString();
     }
 
     private List<Block> runDisplayMacroWithPreVelocity(String velocity, String displayedContent) throws Exception

@@ -36,7 +36,7 @@ import org.xwiki.display.internal.DefaultDocumentDisplayer;
 import org.xwiki.display.internal.DocumentContentAsyncExecutor;
 import org.xwiki.display.internal.DocumentContentAsyncRenderer;
 import org.xwiki.display.internal.DocumentContentDisplayer;
-import org.xwiki.display.internal.DocumentReferenceDequeContext;
+import org.xwiki.display.internal.DocumentDisplayerRecursion;
 import org.xwiki.display.internal.DocumentTitleDisplayer;
 import org.xwiki.internal.document.DocumentRequiredRightsReader;
 import org.xwiki.internal.script.XWikiScriptContextInitializer;
@@ -55,6 +55,8 @@ import org.xwiki.properties.internal.converter.EnumConverter;
 import org.xwiki.rendering.async.internal.BaseAsyncRendererExecutor;
 import org.xwiki.rendering.async.internal.DefaultAsyncContext;
 import org.xwiki.rendering.async.internal.block.DefaultBlockAsyncRendererExecutor;
+import org.xwiki.rendering.internal.limits.DefaultRenderingLimits;
+import org.xwiki.rendering.internal.limits.RenderingLimitsConfiguration;
 import org.xwiki.rendering.internal.macro.DefaultMacroContentParser;
 import org.xwiki.rendering.internal.macro.DefaultMacroIdFactory;
 import org.xwiki.rendering.internal.macro.DefaultMacroManager;
@@ -151,6 +153,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
     // Rendering
     XWikiRenderingContext.class,
+    DefaultRenderingLimits.class,
+    RenderingLimitsConfiguration.class,
     DefaultTransformationManager.class,
     StubRenderingConfiguration.class,
     DefaultLinkLabelGenerator.class,
@@ -194,6 +198,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
     DefaultDocumentDisplayer.class,
     DocumentTitleDisplayer.class,
     DocumentContentDisplayer.class,
+    DocumentDisplayerRecursion.class,
     DefaultBlockAsyncRendererExecutor.class,
     DocumentContentAsyncRenderer.class,
     DefaultDocumentContentAsyncParser.class,
@@ -201,7 +206,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
     BaseAsyncRendererExecutor.class,
     DefaultAsyncContext.class,
     SheetDocumentDisplayer.class,
-    DocumentReferenceDequeContext.class,
 
     // Sheet
     DefaultSheetManager.class,

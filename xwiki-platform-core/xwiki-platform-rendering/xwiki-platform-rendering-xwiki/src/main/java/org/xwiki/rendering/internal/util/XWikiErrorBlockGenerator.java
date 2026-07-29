@@ -41,6 +41,8 @@ import org.xwiki.rendering.block.Block;
 import org.xwiki.rendering.block.CompositeBlock;
 import org.xwiki.rendering.block.XDOM;
 import org.xwiki.rendering.internal.transformation.MutableRenderingContext;
+import org.xwiki.rendering.limits.RenderingLimits;
+import org.xwiki.rendering.limits.RenderingLimitsScope;
 import org.xwiki.rendering.transformation.RenderingContext;
 import org.xwiki.script.ScriptContextManager;
 import org.xwiki.template.Template;
@@ -65,6 +67,9 @@ public class XWikiErrorBlockGenerator extends DefaultErrorBlockGenerator
 
     @Inject
     private RenderingContext renderingContext;
+
+    @Inject
+    private RenderingLimits renderingLimits;
 
     @Inject
     private Provider<ScriptContextManager> scriptContextManagerProvider;
@@ -144,8 +149,12 @@ public class XWikiErrorBlockGenerator extends DefaultErrorBlockGenerator
                 renderingContextPushed = true;
             }
 
-            // Execute the template
-            Block block = templateManager.execute(template, inline);
+            // Execute the template. Allow it to use the reserve of the rendering limits as executing the template
+            // triggers a transformation, which would otherwise immediately hit the very limit we might be reporting.
+            Block block;
+            try (RenderingLimitsScope reserve = this.renderingLimits.enterReserve()) {
+                block = templateManager.execute(template, inline);
+            }
 
             return block instanceof XDOM || block instanceof CompositeBlock ? block.getChildren()
                 : Collections.singletonList(block);

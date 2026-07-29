@@ -30,6 +30,7 @@ import org.xwiki.job.JobGroupPath;
 import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.rendering.async.AsyncContext;
 import org.xwiki.rendering.async.internal.DefaultAsyncContext.ContextUse;
+import org.xwiki.rendering.limits.RenderingLimits;
 import org.xwiki.template.TemplateManager;
 
 import com.xpn.xwiki.internal.context.XWikiContextContextStore;
@@ -56,6 +57,9 @@ public class AsyncRendererJob extends AbstractJob<AsyncRendererJobRequest, Async
     @Inject
     private DocumentAccessBridge documentAccessBridge;
 
+    @Inject
+    private RenderingLimits renderingLimits;
+
     @Override
     protected AsyncRendererJobStatus createNewStatus(AsyncRendererJobRequest request)
     {
@@ -72,6 +76,12 @@ public class AsyncRendererJob extends AbstractJob<AsyncRendererJobRequest, Async
     protected void runInternal() throws Exception
     {
         AsyncRenderer renderer = getRequest().getRenderer();
+
+        // Continue the limits of the execution that spawned this job instead of starting with fresh ones. This job
+        // runs in its own, fresh execution context, so the limits have to be restored explicitly.
+        this.renderingLimits.restore(getRequest().getRenderingLimitsSnapshot());
+        // Stop referencing the snapshot from the request as it is kept in the status that is put into the cache.
+        getRequest().setRenderingLimitsSnapshot(null);
 
         // Enable async execution only if cache is disabled as otherwise we could end up with place holders not
         // associated to any job since it was not really executed the following times

@@ -21,7 +21,6 @@ package org.xwiki.rendering.internal.macro.include;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Stack;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -38,6 +37,10 @@ import org.xwiki.rendering.block.HeaderBlock;
 import org.xwiki.rendering.block.MacroBlock;
 import org.xwiki.rendering.block.SectionBlock;
 import org.xwiki.rendering.block.XDOM;
+import org.xwiki.rendering.limits.RecursionLimitExceededException;
+import org.xwiki.rendering.limits.RecursionType;
+import org.xwiki.rendering.limits.RenderingLimits;
+import org.xwiki.rendering.limits.RenderingLimitsScope;
 import org.xwiki.rendering.macro.AbstractMacro;
 import org.xwiki.rendering.macro.MacroExecutionException;
 import org.xwiki.rendering.transformation.MacroTransformationContext;
@@ -53,6 +56,16 @@ import org.xwiki.security.authorization.ContextualAuthorizationManager;
  */
 public abstract class AbstractIncludeMacro<P> extends AbstractMacro<P>
 {
+    /**
+     * Including or displaying a document within itself is always an error, so the limit is one.
+     * <p>
+     * The include and the display macro deliberately share this single recursion type so that a cycle that alternates
+     * between them, like {@code A --include--> B --display--> A}, is caught, too.
+     */
+    private static final RecursionType INCLUSION = new RecursionType("macro.inclusion", 1, 1);
+
+    private static final String RECURSION_MESSAGE = "Found recursive %s of document [%s]";
+
     /**
      * Used to access document content and check view access right.
      */
@@ -84,9 +97,10 @@ public abstract class AbstractIncludeMacro<P> extends AbstractMacro<P>
     protected EntityReferenceResolver<String> macroEntityReferenceResolver;
 
     /**
-     * A stack of all currently executing include/display macros for catching recursive inclusions/displays.
+     * Used to catch recursive inclusions/displays.
      */
-    protected ThreadLocal<Stack<Object>> macrosBeingExecuted = new ThreadLocal<>();
+    @Inject
+    protected RenderingLimits renderingLimits;
 
     private final ParserUtils parserUtils = new ParserUtils();
 
@@ -138,20 +152,28 @@ public abstract class AbstractIncludeMacro<P> extends AbstractMacro<P>
     }
 
     /**
-     * Protect form recursive include/display.
+     * Enter a recursion level for the given document, protecting from recursive include/display.
+     * <p>
+     * Note that the level only covers displaying the document, it is closed again as soon as the display returned. With
+     * {@code context="current"} the content is instead inserted into the content being transformed and thus executed by
+     * the outer transformation, i.e., outside this level. That case is covered by
+     * {@link IncludeMacro#checkBlockRecursion(Block, EntityReference)}, which walks the block tree of the content being
+     * transformed, and, when the inclusion is itself nested in another include or display, additionally by the still
+     * open level of that enclosing macro.
      *
      * @param reference the reference of the document being included/displayed
-     * @param messageText the portion of test to insert in the error message when an error occurs, to represent the
+     * @param messageText the portion of text to insert in the error message when an error occurs, to represent the
      *                    action done (e.g. "inclusion", "display")
+     * @return the entered level, to be closed once the document has been displayed
      * @throws MacroExecutionException recursive inclusion/display has been found
      */
-    protected void checkRecursion(EntityReference reference, String messageText) throws MacroExecutionException
+    protected RenderingLimitsScope enterRecursion(DocumentReference reference, String messageText)
+        throws MacroExecutionException
     {
-        // Try to find recursion in the thread
-        Stack<Object> references = this.macrosBeingExecuted.get();
-        if (references != null && references.contains(reference)) {
-            throw new MacroExecutionException(String.format("Found recursive %s of document [%s]", messageText,
-                reference));
+        try {
+            return this.renderingLimits.enter(INCLUSION, this.defaultEntityReferenceSerializer.serialize(reference));
+        } catch (RecursionLimitExceededException e) {
+            throw new MacroExecutionException(String.format(RECURSION_MESSAGE, messageText, reference), e);
         }
     }
 

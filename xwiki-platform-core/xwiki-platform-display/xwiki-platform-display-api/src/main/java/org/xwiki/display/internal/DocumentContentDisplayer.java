@@ -20,7 +20,7 @@
 package org.xwiki.display.internal;
 
 import java.util.Arrays;
-import java.util.Deque;
+import java.util.Optional;
 import java.util.Set;
 
 import javax.inject.Inject;
@@ -31,11 +31,11 @@ import javax.inject.Singleton;
 import org.slf4j.Logger;
 import org.xwiki.bridge.DocumentModelBridge;
 import org.xwiki.component.annotation.Component;
-import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.rendering.async.internal.AsyncRendererConfiguration;
 import org.xwiki.rendering.async.internal.block.BlockAsyncRendererExecutor;
 import org.xwiki.rendering.block.Block;
 import org.xwiki.rendering.block.XDOM;
+import org.xwiki.rendering.limits.RenderingLimitsScope;
 
 /**
  * Displays the content of a document.
@@ -48,13 +48,6 @@ import org.xwiki.rendering.block.XDOM;
 @Singleton
 public class DocumentContentDisplayer implements DocumentDisplayer
 {
-    /**
-     * The number of recursive displays of a single document that are allowed until we stop. We need this to be at
-     * least two when a document with a sheet displays the content, as it is the case in App Within Minutes.
-     * Set it to five to be sure that it is enough.
-     */
-    private static final int INCLUSION_LIMIT = 5;
-
     @Inject
     private Provider<DocumentContentAsyncRenderer> rendererProvider;
 
@@ -62,7 +55,7 @@ public class DocumentContentDisplayer implements DocumentDisplayer
     private BlockAsyncRendererExecutor executor;
 
     @Inject
-    private DocumentReferenceDequeContext documentReferenceDequeContext;
+    private DocumentDisplayerRecursion displayerRecursion;
 
     @Inject
     private Logger logger;
@@ -70,17 +63,16 @@ public class DocumentContentDisplayer implements DocumentDisplayer
     @Override
     public XDOM display(DocumentModelBridge document, DocumentDisplayerParameters parameters)
     {
-        Deque<DocumentReference> documentDeque =
-            this.documentReferenceDequeContext.getDocumentReferenceDeque("content");
+        Optional<RenderingLimitsScope> recursionLevel =
+            this.displayerRecursion.enterContent(document.getDocumentReference());
 
-        if (countMatchingReferences(document, documentDeque) >= INCLUSION_LIMIT) {
+        if (recursionLevel.isEmpty()) {
             this.logger.warn("Infinite recursion of document content detected in [{}].",
                 document.getDocumentReference());
             throw new RuntimeException("Infinite document inclusion detected.");
         }
 
-        documentDeque.push(document.getDocumentReference());
-        try {
+        try (RenderingLimitsScope ignored = recursionLevel.get()) {
             // Get a renderer
             DocumentContentAsyncRenderer renderer = this.rendererProvider.get();
             Set<String> contextEntries = renderer.initialize(document, parameters);
@@ -95,14 +87,6 @@ public class DocumentContentDisplayer implements DocumentDisplayer
             return block instanceof XDOM xdom ? xdom : new XDOM(Arrays.asList(block));
         } catch (Exception e) {
             throw new RuntimeException(e.getMessage(), e);
-        } finally {
-            documentDeque.pop();
         }
-    }
-
-    private static long countMatchingReferences(DocumentModelBridge document, Deque<DocumentReference> documentDeque)
-    {
-        DocumentReference documentReference = document.getDocumentReference();
-        return documentDeque.stream().filter(ref -> ref.equals(documentReference)).count();
     }
 }

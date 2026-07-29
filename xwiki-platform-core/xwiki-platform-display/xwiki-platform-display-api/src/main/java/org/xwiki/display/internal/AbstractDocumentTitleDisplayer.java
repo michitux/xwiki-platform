@@ -21,9 +21,9 @@ package org.xwiki.display.internal;
 
 import java.io.StringReader;
 import java.io.StringWriter;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -35,11 +35,11 @@ import org.xwiki.bridge.DocumentModelBridge;
 import org.xwiki.configuration.ConfigurationSource;
 import org.xwiki.model.EntityType;
 import org.xwiki.model.ModelContext;
-import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.model.reference.EntityReference;
 import org.xwiki.model.reference.EntityReferenceProvider;
 import org.xwiki.model.reference.EntityReferenceSerializer;
 import org.xwiki.rendering.block.XDOM;
+import org.xwiki.rendering.limits.RenderingLimitsScope;
 import org.xwiki.rendering.parser.ParseException;
 import org.xwiki.rendering.parser.Parser;
 import org.xwiki.rendering.util.ParserUtils;
@@ -91,7 +91,7 @@ public abstract class AbstractDocumentTitleDisplayer implements DocumentDisplaye
     private EntityReferenceSerializer<String> defaultEntityReferenceSerializer;
 
     @Inject
-    private DocumentReferenceDequeContext documentReferenceDequeContext;
+    private DocumentDisplayerRecursion displayerRecursion;
 
     @Inject
     @Named("xwikicfg")
@@ -121,10 +121,10 @@ public abstract class AbstractDocumentTitleDisplayer implements DocumentDisplaye
     {
         // Protect against infinite recursion which can happen for instance if the document title displayer is called on
         // the current document from the title field or from a script within the first content heading.
-        Deque<DocumentReference> documentReferenceStack =
-            this.documentReferenceDequeContext.getDocumentReferenceDeque("title");
+        Optional<RenderingLimitsScope> recursionLevel =
+            this.displayerRecursion.enterTitle(document.getDocumentReference());
 
-        if (documentReferenceStack.contains(document.getDocumentReference())) {
+        if (recursionLevel.isEmpty()) {
             this.logger.warn(
                 "Infinite recursion detected while displaying the title of [{}]. Using the document name as title.",
                 document.getDocumentReference());
@@ -132,14 +132,10 @@ public abstract class AbstractDocumentTitleDisplayer implements DocumentDisplaye
             return getStaticTitle(document);
         }
 
-        documentReferenceStack.push(document.getDocumentReference());
-        try {
+        try (RenderingLimitsScope ignored = recursionLevel.get()) {
             return displayTitle(document, parameters);
-        } finally {
-            documentReferenceStack.pop();
         }
     }
-
 
     private XDOM displayTitle(DocumentModelBridge document, DocumentDisplayerParameters parameters)
     {

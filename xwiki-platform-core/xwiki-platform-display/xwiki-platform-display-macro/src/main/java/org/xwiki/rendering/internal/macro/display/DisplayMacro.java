@@ -22,7 +22,6 @@ package org.xwiki.rendering.internal.macro.display;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.Stack;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -35,6 +34,7 @@ import org.xwiki.rendering.block.Block;
 import org.xwiki.rendering.block.MetaDataBlock;
 import org.xwiki.rendering.block.XDOM;
 import org.xwiki.rendering.internal.macro.include.AbstractIncludeMacro;
+import org.xwiki.rendering.limits.RenderingLimitsScope;
 import org.xwiki.rendering.listener.MetaData;
 import org.xwiki.rendering.macro.MacroExecutionException;
 import org.xwiki.rendering.macro.display.DisplayMacroParameters;
@@ -81,7 +81,6 @@ public class DisplayMacro extends AbstractIncludeMacro<DisplayMacroParameters>
         // Step 1: Perform checks.
         EntityReference displayedReference = resolve(context.getCurrentMacroBlock(), parameters.getReference(),
             parameters.getType(), DISPLAY);
-        checkRecursion(displayedReference, DISPLAY);
 
         // Step 2: Retrieve the document to display.
         DocumentModelBridge documentBridge;
@@ -118,24 +117,16 @@ public class DisplayMacro extends AbstractIncludeMacro<DisplayMacroParameters>
             displayParameters.setIdGenerator(context.getXDOM().getIdGenerator());
         }
 
-        Stack<Object> references = this.macrosBeingExecuted.get();
-        if (references == null) {
-            references = new Stack<>();
-            this.macrosBeingExecuted.set(references);
-        }
-        references.push(documentBridge.getDocumentReference());
+        // The level is entered on the resolved document reference so that it cannot be circumvented by using a
+        // different kind of reference to the same document. It is deliberately entered outside the try-block below so
+        // that the MacroExecutionException it throws isn't wrapped again by that block's catch-clause.
+        RenderingLimitsScope level = enterRecursion(documentBridge.getDocumentReference(), DISPLAY);
 
         XDOM result;
-        try {
+        try (level) {
             result = this.documentDisplayer.display(documentBridge, displayParameters);
         } catch (Exception e) {
             throw new MacroExecutionException(e.getMessage(), e);
-        } finally {
-            references.pop();
-            if (references.isEmpty()) {
-                // Get rid of the current ThreadLocal if not needed anymore
-                this.macrosBeingExecuted.remove();
-            }
         }
 
         // Step 5: If the user has asked for it, remove both Section and Heading Blocks if the first displayed block is

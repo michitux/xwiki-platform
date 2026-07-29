@@ -40,6 +40,8 @@ import org.xwiki.job.JobGroupPath;
 import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.rendering.RenderingException;
 import org.xwiki.rendering.async.AsyncContext;
+import org.xwiki.rendering.limits.RenderingLimits;
+import org.xwiki.rendering.limits.RenderingLimitsSnapshot;
 import org.xwiki.test.junit5.mockito.ComponentTest;
 import org.xwiki.test.junit5.mockito.InjectMockComponents;
 import org.xwiki.test.junit5.mockito.MockComponent;
@@ -86,6 +88,9 @@ class DefaultAsyncRendererExecutorTest
 
     @MockComponent
     private DocumentAccessBridge documentAccessBridge;
+
+    @MockComponent
+    private RenderingLimits renderingLimits;
 
     @InjectMockComponents
     private DefaultAsyncRendererExecutor executor;
@@ -282,5 +287,22 @@ class DefaultAsyncRendererExecutorTest
 
         assertNotNull(response.getAsyncClientId());
         assertSame(status, response.getStatus());
+    }
+
+    @Test
+    void theLimitsAreHandedOverToTheJob() throws Exception
+    {
+        when(this.asyncContext.isEnabled()).thenReturn(true);
+        when(this.renderer.isAsyncAllowed()).thenReturn(true);
+        when(this.renderer.isCacheAllowed()).thenReturn(true);
+        RenderingLimitsSnapshot snapshot = mock();
+        when(this.renderingLimits.save()).thenReturn(snapshot);
+
+        AsyncRendererExecutorResponse response = this.executor.render(this.renderer, this.configuration);
+
+        assertNotNull(response.getAsyncClientId());
+        // The job continues the limits of this execution instead of starting with fresh ones.
+        assertSame(snapshot,
+            ((AsyncRendererJobRequest) response.getStatus().getRequest()).getRenderingLimitsSnapshot());
     }
 }

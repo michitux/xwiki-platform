@@ -53,6 +53,7 @@ import org.xwiki.rendering.RenderingException;
 import org.xwiki.rendering.async.AsyncContext;
 import org.xwiki.rendering.async.AsyncContextHandler;
 import org.xwiki.rendering.async.internal.DefaultAsyncContext.ContextUse;
+import org.xwiki.rendering.limits.RenderingLimits;
 import org.xwiki.security.authorization.AuthorExecutor;
 
 import com.xpn.xwiki.internal.context.XWikiContextContextStore;
@@ -97,6 +98,9 @@ public class DefaultAsyncRendererExecutor implements AsyncRendererExecutor
 
     @Inject
     private DocumentAccessBridge documentAccessBridge;
+
+    @Inject
+    private RenderingLimits renderingLimits;
 
     @Inject
     private Logger logger;
@@ -216,6 +220,11 @@ public class DefaultAsyncRendererExecutor implements AsyncRendererExecutor
                 }
 
                 request.setId(jobId);
+
+                // Carry the limits over to the job so that an asynchronous execution continues the recursion depths of
+                // the execution it spawned from instead of starting with fresh ones. This is only set once the
+                // execution is really going to happen as the request ends up in the cache.
+                request.setRenderingLimitsSnapshot(this.renderingLimits.save());
 
                 Job job = this.executor.execute(AsyncRendererJobStatus.JOBTYPE, request);
 

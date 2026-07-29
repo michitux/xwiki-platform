@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.Stack;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -40,6 +39,7 @@ import org.xwiki.rendering.block.MacroBlock;
 import org.xwiki.rendering.block.MacroMarkerBlock;
 import org.xwiki.rendering.block.MetaDataBlock;
 import org.xwiki.rendering.block.XDOM;
+import org.xwiki.rendering.limits.RenderingLimitsScope;
 import org.xwiki.rendering.listener.MetaData;
 import org.xwiki.rendering.macro.MacroExecutionException;
 import org.xwiki.rendering.macro.include.IncludeMacroParameters;
@@ -101,7 +101,7 @@ public class IncludeMacro extends AbstractIncludeMacro<IncludeMacroParameters>
         // Step 1: Perform checks.
         EntityReference includedReference =
             resolve(context.getCurrentMacroBlock(), parameters.getReference(), parameters.getType(), "include");
-        checkRecursion(context.getCurrentMacroBlock(), includedReference);
+        checkBlockRecursion(context.getCurrentMacroBlock(), includedReference);
 
         // Step 2a: Retrieve the included document.
         DocumentModelBridge documentBridge;
@@ -146,24 +146,18 @@ public class IncludeMacro extends AbstractIncludeMacro<IncludeMacroParameters>
             displayParameters.setIdGenerator(context.getXDOM().getIdGenerator());
         }
 
-        Stack<Object> references = this.macrosBeingExecuted.get();
-        if (parametersContext == Context.NEW) {
-            if (references == null) {
-                references = new Stack<>();
-                this.macrosBeingExecuted.set(references);
-            }
-            references.push(documentBridge.getDocumentReference());
-        }
+        // The level is entered on the resolved document reference so that it cannot be circumvented by using a
+        // different kind of reference to the same document. It is deliberately entered outside the try-block below so
+        // that the MacroExecutionException it throws isn't wrapped again by that block's catch-clause.
+        // Note that the level is closed again before step 7 executes the content of a context="current" inclusion, see
+        // AbstractIncludeMacro#enterRecursion for why that is fine.
+        RenderingLimitsScope level = enterRecursion(documentBridge.getDocumentReference(), "inclusion");
 
         XDOM result;
-        try {
+        try (level) {
             result = this.documentDisplayer.display(documentBridge, displayParameters);
         } catch (Exception e) {
             throw new MacroExecutionException(e.getMessage(), e);
-        } finally {
-            if (parametersContext == Context.NEW) {
-                references.pop();
-            }
         }
 
         // Step 5: If the user has asked for it, remove both Section and Heading Blocks if the first included block is
@@ -233,10 +227,8 @@ public class IncludeMacro extends AbstractIncludeMacro<IncludeMacroParameters>
      * @param reference the reference of the document being included
      * @throws MacroExecutionException recursive inclusion has been found
      */
-    protected void checkRecursion(Block currentBlock, EntityReference reference) throws MacroExecutionException
+    protected void checkBlockRecursion(Block currentBlock, EntityReference reference) throws MacroExecutionException
     {
-        super.checkRecursion(reference, "inclusion");
-
         // Check for parent context=current macros
         Block parentBlock = currentBlock.getParent();
 
@@ -245,7 +237,7 @@ public class IncludeMacro extends AbstractIncludeMacro<IncludeMacroParameters>
                 throw new MacroExecutionException("Found recursive inclusion of document [" + reference + "]");
             }
 
-            checkRecursion(parentBlock, reference);
+            checkBlockRecursion(parentBlock, reference);
         }
     }
 

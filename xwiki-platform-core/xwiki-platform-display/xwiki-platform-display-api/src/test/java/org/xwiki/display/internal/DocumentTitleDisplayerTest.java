@@ -43,6 +43,8 @@ import org.xwiki.model.reference.EntityReferenceProvider;
 import org.xwiki.model.reference.WikiReference;
 import org.xwiki.rendering.block.WordBlock;
 import org.xwiki.rendering.block.XDOM;
+import org.xwiki.rendering.internal.limits.DefaultRenderingLimits;
+import org.xwiki.rendering.internal.limits.RenderingLimitsConfiguration;
 import org.xwiki.rendering.parser.Parser;
 import org.xwiki.security.authorization.DocumentAuthorizationManager;
 import org.xwiki.security.authorization.Right;
@@ -70,7 +72,10 @@ import static org.mockito.Mockito.when;
  * @version $Id$
  */
 @ComponentTest
-@ComponentList(DocumentReferenceDequeContext.class)
+@ComponentList({
+    DefaultRenderingLimits.class,
+    DocumentDisplayerRecursion.class
+})
 class DocumentTitleDisplayerTest
 {
     @InjectMockComponents
@@ -78,6 +83,9 @@ class DocumentTitleDisplayerTest
 
     @MockComponent
     private Execution execution;
+
+    @MockComponent
+    private RenderingLimitsConfiguration renderingLimitsConfiguration;
 
     @MockComponent
     private EntityReferenceProvider defaultEntityReferenceProvider;

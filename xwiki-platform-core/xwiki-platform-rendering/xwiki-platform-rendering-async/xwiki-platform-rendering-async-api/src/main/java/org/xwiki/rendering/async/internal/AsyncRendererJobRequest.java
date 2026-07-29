@@ -22,6 +22,7 @@ package org.xwiki.rendering.async.internal;
 import org.xwiki.job.AbstractRequest;
 import org.xwiki.job.JobGroupPath;
 import org.xwiki.job.Request;
+import org.xwiki.rendering.limits.RenderingLimitsSnapshot;
 
 /**
  * The request of the asynchronous renderer job.
@@ -34,6 +35,12 @@ public class AsyncRendererJobRequest extends AbstractRequest
     private transient AsyncRenderer renderer;
 
     private JobGroupPath jobGroupPath;
+
+    /**
+     * Transient as a snapshot isn't serializable, and it isn't part of the request's identity either: it is only used
+     * to hand the limits over to the thread executing the job.
+     */
+    private transient RenderingLimitsSnapshot limitsSnapshot;
 
     /**
      * The default constructor.
@@ -86,5 +93,33 @@ public class AsyncRendererJobRequest extends AbstractRequest
     public JobGroupPath getJobGroupPath()
     {
         return jobGroupPath;
+    }
+
+    /**
+     * The state of the rendering limits when this job was requested, i.e. the recursion depths that were already
+     * reached, so that executing content asynchronously cannot be used to get fresh limits.
+     * <p>
+     * Note that this is deliberately not propagated through the {@link org.xwiki.context.ContextStore} like the rest
+     * of the context: every context store entry ends up in the job id, and thus in the cache key and in the URL used
+     * to fetch the result, so a value that changes with the recursion depth would fragment the asynchronous renderer
+     * cache.
+     * <p>
+     * It is cleared once the job has taken it over so that a cached job status doesn't keep it alive.
+     *
+     * @return the limits to continue in the job's execution context, may be {@code null}
+     * @since 18.7.0RC1
+     */
+    public RenderingLimitsSnapshot getRenderingLimitsSnapshot()
+    {
+        return this.limitsSnapshot;
+    }
+
+    /**
+     * @param limitsSnapshot the limits to continue in the job's execution context
+     * @since 18.7.0RC1
+     */
+    public void setRenderingLimitsSnapshot(RenderingLimitsSnapshot limitsSnapshot)
+    {
+        this.limitsSnapshot = limitsSnapshot;
     }
 }

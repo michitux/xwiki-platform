@@ -82,7 +82,8 @@ public class MacroContentExecutor implements ContentExecutor<MacroTransformation
     private void executeContent(XDOM xdom, MacroTransformationContext macroContext) throws ContentExecutorException
     {
         try {
-            // Execute the transformation through the rendering context and not directly so that it gets its own
+            // Execute the transformation through the rendering context and not directly so that this nested
+            // transformation is counted against the limit for recursive transformations and so that it gets its own
             // rendering context instead of modifying the context of the transformation that triggered this execution.
             ((MutableRenderingContext) this.renderingContext).transformInContext(this.macroTransformation,
                 macroContext.getTransformationContext(), xdom);

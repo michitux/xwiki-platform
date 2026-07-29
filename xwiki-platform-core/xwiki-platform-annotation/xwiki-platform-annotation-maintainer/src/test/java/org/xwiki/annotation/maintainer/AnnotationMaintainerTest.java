@@ -40,6 +40,8 @@ import org.xwiki.annotation.maintainer.internal.DefaultAnnotationMaintainer;
 import org.xwiki.component.manager.ComponentManager;
 import org.xwiki.context.internal.DefaultExecution;
 import org.xwiki.rendering.internal.configuration.DefaultRenderingConfiguration;
+import org.xwiki.rendering.internal.limits.DefaultRenderingLimits;
+import org.xwiki.rendering.internal.limits.RenderingLimitsConfiguration;
 import org.xwiki.rendering.internal.parser.plain.PlainTextStreamParser;
 import org.xwiki.rendering.internal.parser.reference.type.URLResourceReferenceTypeParser;
 import org.xwiki.rendering.internal.renderer.DefaultLinkLabelGenerator;
@@ -83,6 +85,8 @@ import static org.mockito.Mockito.when;
     DefaultTransformationManager.class,
     DefaultRenderingConfiguration.class,
     DefaultRenderingContext.class,
+    DefaultRenderingLimits.class,
+    RenderingLimitsConfiguration.class,
     DefaultExecution.class,
     CharacterDiffService.class,
     WhiteSpaceContentAlterer.class
