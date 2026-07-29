@@ -295,6 +295,14 @@ environment.permanentDirectory = $xwikiPropertiesEnvironmentPermanentDirectory
 # rendering.limits.macro.executions.limit = 100000
 
 #-# [Since 18.7.0RC1]
+#-# The maximum size, in bytes, of the content that the macros of one rendering may produce. This is a rough estimate of
+#-# the size of the produced content and not a measure of the memory usage, and content that passes through several
+#-# macros is counted several times.
+#-#
+#-# The default is:
+# rendering.limits.document.size.limit = 10485760
+
+#-# [Since 18.7.0RC1]
 #-# The maximum time, in milliseconds, that one rendering may take. It is checked between two macro executions, so a
 #-# single macro that never returns isn't caught by it, and it is the sum of the time of the rendering and of the
 #-# asynchronous executions it spawns.
