@@ -35,6 +35,7 @@ import org.xwiki.rendering.async.internal.block.BlockAsyncRendererExecutor;
 import org.xwiki.rendering.block.Block;
 import org.xwiki.rendering.block.XDOM;
 import org.xwiki.rendering.internal.limits.DefaultRenderingLimits;
+import org.xwiki.rendering.internal.limits.DefaultRenderingLimitsProfileResolver;
 import org.xwiki.rendering.internal.limits.RenderingLimitsConfiguration;
 import org.xwiki.rendering.listener.MetaData;
 import org.xwiki.rendering.transformation.TransformationContext;
@@ -62,6 +63,7 @@ import static org.mockito.Mockito.when;
 @ComponentList({
     DefaultDocumentContentAsyncParser.class,
     DefaultRenderingLimits.class,
+    DefaultRenderingLimitsProfileResolver.class,
     DocumentDisplayerRecursion.class
 })
 class DocumentContentDisplayerTest

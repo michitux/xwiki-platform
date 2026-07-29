@@ -41,6 +41,7 @@ import org.xwiki.component.manager.ComponentManager;
 import org.xwiki.context.internal.DefaultExecution;
 import org.xwiki.rendering.internal.configuration.DefaultRenderingConfiguration;
 import org.xwiki.rendering.internal.limits.DefaultRenderingLimits;
+import org.xwiki.rendering.internal.limits.DefaultRenderingLimitsProfileResolver;
 import org.xwiki.rendering.internal.limits.RenderingLimitsConfiguration;
 import org.xwiki.rendering.internal.parser.plain.PlainTextStreamParser;
 import org.xwiki.rendering.internal.parser.reference.type.URLResourceReferenceTypeParser;
@@ -86,6 +87,7 @@ import static org.mockito.Mockito.when;
     DefaultRenderingConfiguration.class,
     DefaultRenderingContext.class,
     DefaultRenderingLimits.class,
+    DefaultRenderingLimitsProfileResolver.class,
     RenderingLimitsConfiguration.class,
     DefaultExecution.class,
     CharacterDiffService.class,

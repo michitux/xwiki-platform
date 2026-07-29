@@ -280,8 +280,8 @@ environment.permanentDirectory = $xwikiPropertiesEnvironmentPermanentDirectory
 #-# - log: only log the exhausted budgets without ever refusing anything, which is the mode to use for finding out
 #-#   which limits a wiki needs before enforcing them.
 #-# - disabled: don't count anything.
-#-# Note that it doesn't apply to the recursion limits above: those protect against stack overflows, which cannot
-#-# sensibly be turned into a warning.
+#-# This can also be set per profile, see below. Note that it doesn't apply to the recursion limits above: those protect
+#-# against stack overflows, which cannot sensibly be turned into a warning.
 #-#
 #-# The default is:
 # rendering.limits.mode = enforce
@@ -323,6 +323,27 @@ environment.permanentDirectory = $xwikiPropertiesEnvironmentPermanentDirectory
 #-#
 #-# The default is:
 # rendering.limits.error.messages.limit = 100
+
+#-# [Since 18.7.0RC1]
+#-# Rendering a page for a request and rendering it as part of a job that legitimately consumes more resources are
+#-# different use cases, so every budget and the mode above can also be configured per profile:
+#-#
+#-#   rendering.limits.profile.<profile>.<type>.limit = <maximum amount>
+#-#   rendering.limits.profile.<profile>.mode = <mode>
+#-#
+#-# The profile of a rendering is the type of the job it runs in, with the slashes replaced by dots, and then the
+#-# generic "job" profile, so that either a single job type or all background work can be configured at once. The
+#-# profiles of the known job types are export.pdf, macrojob (of the Job Macro) and asyncrenderer, but note that an
+#-# asynchronous rendering continues the budgets of the rendering that spawned it, which take precedence over any
+#-# profile. A rendering that doesn't run in a job, i.e. rendering content for a request, always uses the global
+#-# configuration above.
+#-#
+#-# Note that the PDF export renders every exported page as a rendering of its own, so these are per page and not for the
+#-# export as a whole, whose size is bounded by the maximum content size of the PDF export configuration instead.
+#-#
+#-# There is no profile configured by default. An example that gives the pages of a PDF export ten times the default
+#-# time:
+# rendering.limits.profile.export.pdf.time.limit = 600000
 
 #-------------------------------------------------------------------------------------
 # Rendering Transformations

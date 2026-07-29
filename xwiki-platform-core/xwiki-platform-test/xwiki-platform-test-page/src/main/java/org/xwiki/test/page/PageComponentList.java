@@ -56,6 +56,7 @@ import org.xwiki.rendering.async.internal.BaseAsyncRendererExecutor;
 import org.xwiki.rendering.async.internal.DefaultAsyncContext;
 import org.xwiki.rendering.async.internal.block.DefaultBlockAsyncRendererExecutor;
 import org.xwiki.rendering.internal.limits.DefaultRenderingLimits;
+import org.xwiki.rendering.internal.limits.DefaultRenderingLimitsProfileResolver;
 import org.xwiki.rendering.internal.limits.RenderingLimitsConfiguration;
 import org.xwiki.rendering.internal.macro.DefaultMacroContentParser;
 import org.xwiki.rendering.internal.macro.DefaultMacroIdFactory;
@@ -154,6 +155,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
     // Rendering
     XWikiRenderingContext.class,
     DefaultRenderingLimits.class,
+    DefaultRenderingLimitsProfileResolver.class,
     RenderingLimitsConfiguration.class,
     DefaultTransformationManager.class,
     StubRenderingConfiguration.class,

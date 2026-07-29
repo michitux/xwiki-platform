@@ -67,6 +67,12 @@
       <version>${commons.version}</version>
     </dependency>
     <dependency>
+      <!-- For selecting the profile of the rendering limits based on the current job. -->
+      <groupId>org.xwiki.commons</groupId>
+      <artifactId>xwiki-commons-job-api</artifactId>
+      <version>${commons.version}</version>
+    </dependency>
+    <dependency>
       <!-- For parsing the CSS from the style attribute. -->
       <groupId>net.sourceforge.cssparser</groupId>
       <artifactId>cssparser</artifactId>
@@ -91,6 +97,13 @@
       <artifactId>httpclient</artifactId>
     </dependency>
     <!-- Testing dependencies -->
+    <dependency>
+      <!-- For the JobContext used to select the profile of the rendering limits. -->
+      <groupId>org.xwiki.commons</groupId>
+      <artifactId>xwiki-commons-job-default</artifactId>
+      <version>${commons.version}</version>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.xwiki.rendering</groupId>
       <artifactId>xwiki-rendering-test</artifactId>

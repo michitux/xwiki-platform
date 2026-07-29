@@ -43,6 +43,7 @@ import org.xwiki.properties.internal.converter.ConvertUtilsConverter;
 import org.xwiki.properties.internal.converter.EnumConverter;
 import org.xwiki.properties.internal.converter.LocaleConverter;
 import org.xwiki.rendering.internal.limits.DefaultRenderingLimits;
+import org.xwiki.rendering.internal.limits.DefaultRenderingLimitsProfileResolver;
 import org.xwiki.rendering.internal.limits.RenderingLimitsConfiguration;
 import org.xwiki.rendering.internal.transformation.XWikiRenderingContext;
 import org.xwiki.test.annotation.ComponentList;
@@ -109,6 +110,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
     XWikiLocalizationContext.class,
     XWikiRenderingContext.class,
     DefaultRenderingLimits.class,
+    DefaultRenderingLimitsProfileResolver.class,
     RenderingLimitsConfiguration.class,
     BooleanMetaClass.class,
     ComputedFieldMetaClass.class,
