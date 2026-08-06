@@ -21,25 +21,34 @@ package org.xwiki.rendering.internal.util;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import javax.script.ScriptContext;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.xwiki.context.Execution;
 import org.xwiki.context.ExecutionContext;
+import org.xwiki.rendering.RenderingException;
 import org.xwiki.rendering.block.Block;
+import org.xwiki.rendering.block.GroupBlock;
+import org.xwiki.rendering.block.MacroBlock;
 import org.xwiki.rendering.block.VerbatimBlock;
 import org.xwiki.rendering.block.WordBlock;
 import org.xwiki.rendering.block.XDOM;
 import org.xwiki.rendering.internal.transformation.MutableRenderingContext;
+import org.xwiki.rendering.limits.RenderingLimitType;
+import org.xwiki.rendering.macro.MacroRenderingLimitExceededException;
 import org.xwiki.rendering.transformation.RenderingContext;
 import org.xwiki.rendering.util.ErrorBlockGenerator;
 import org.xwiki.script.ScriptContextManager;
 import org.xwiki.script.internal.CloneableSimpleScriptContext;
 import org.xwiki.template.Template;
 import org.xwiki.template.TemplateManager;
+import org.xwiki.test.LogLevel;
 import org.xwiki.test.annotation.AfterComponent;
+import org.xwiki.test.junit5.LogCaptureExtension;
 import org.xwiki.test.junit5.mockito.ComponentTest;
 import org.xwiki.test.junit5.mockito.InjectComponentManager;
 import org.xwiki.test.junit5.mockito.InjectMockComponents;
@@ -83,6 +92,9 @@ class XWikiErrorBlockGeneratorTest
     private ExecutionContext econtext;
 
     private ScriptContext scontext;
+
+    @RegisterExtension
+    private LogCaptureExtension logCapture = new LogCaptureExtension(LogLevel.ERROR);
 
     @AfterComponent
     void afterComponent() throws Exception
@@ -172,6 +184,59 @@ class XWikiErrorBlockGeneratorTest
             ((WordBlock) blocks.get(0).getChildren().get(0)).getWord());
         assertTrue(((VerbatimBlock) blocks.get(1).getChildren().get(0)).getProtectedString()
             .contains("java.lang.Exception: exception"));
+    }
+
+    @Test
+    void templateResultWithAMacroFallsBackToThePlainMessage() throws Exception
+    {
+        Template template = mock();
+        when(this.templateManager.getTemplate(ErrorBlockGenerator.CLASS_ATTRIBUTE_MESSAGE_VALUE + "/default.vm"))
+            .thenReturn(template);
+        // A rendering limit stopped the transformation of the template, so its result still contains the macros the
+        // template is made of. They would be executed outside the reserve scope by the transformation this message is
+        // inserted into, so they would fail again and get an error message in the place of this one.
+        XDOM xdom = new XDOM(List.of(new GroupBlock(List.of(new MacroBlock("box", Map.of(), false)))));
+        when(this.templateManager.execute(template, false)).thenReturn(xdom);
+
+        List<Block> blocks = this.errorGenerator.generateErrorBlocks("message.", "description.", false);
+
+        assertEquals(2, blocks.size());
+        assertEquals("message. Click on this message for details.",
+            ((WordBlock) blocks.get(0).getChildren().get(0)).getWord());
+        assertEquals("description.", ((VerbatimBlock) blocks.get(1).getChildren().get(0)).getProtectedString());
+    }
+
+    @Test
+    void limitFailureOfTheTemplateIsNotLoggedAsAnError() throws Exception
+    {
+        Template template = mock();
+        when(this.templateManager.getTemplate(ErrorBlockGenerator.CLASS_ATTRIBUTE_MESSAGE_VALUE + "/default.vm"))
+            .thenReturn(template);
+        when(this.templateManager.execute(template, false)).thenThrow(new RenderingException("Failed to render",
+            new MacroRenderingLimitExceededException(RenderingLimitType.DOCUMENT_SIZE, "The content doesn't fit.")));
+
+        List<Block> blocks = this.errorGenerator.generateErrorBlocks("message.", "description.", false);
+
+        // The plain message is used instead. Nothing is logged as an error: the reserve for the error messages of the
+        // rendering being used up is expected, and the exhausted limit itself has been reported already.
+        assertEquals(2, blocks.size());
+        assertEquals("message. Click on this message for details.",
+            ((WordBlock) blocks.get(0).getChildren().get(0)).getWord());
+        assertEquals(0, this.logCapture.size());
+    }
+
+    @Test
+    void otherFailureOfTheTemplateIsLoggedAsAnError() throws Exception
+    {
+        Template template = mock();
+        when(this.templateManager.getTemplate(ErrorBlockGenerator.CLASS_ATTRIBUTE_MESSAGE_VALUE + "/default.vm"))
+            .thenReturn(template);
+        when(this.templateManager.execute(template, false)).thenThrow(new RenderingException("Failed to render"));
+
+        List<Block> blocks = this.errorGenerator.generateErrorBlocks("message.", "description.", false);
+
+        assertEquals(2, blocks.size());
+        assertEquals("Failed to generate error rendering message", this.logCapture.getMessage(0));
     }
 
     @Test

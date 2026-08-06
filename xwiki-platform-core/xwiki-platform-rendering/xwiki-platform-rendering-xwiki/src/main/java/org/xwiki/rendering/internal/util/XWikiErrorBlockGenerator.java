@@ -39,10 +39,14 @@ import org.xwiki.logging.Message;
 import org.xwiki.logging.marker.TranslationMarker;
 import org.xwiki.rendering.block.Block;
 import org.xwiki.rendering.block.CompositeBlock;
+import org.xwiki.rendering.block.MacroBlock;
 import org.xwiki.rendering.block.XDOM;
+import org.xwiki.rendering.block.match.ClassBlockMatcher;
 import org.xwiki.rendering.internal.transformation.MutableRenderingContext;
+import org.xwiki.rendering.limits.RecursionLimitExceededException;
 import org.xwiki.rendering.limits.RenderingLimits;
 import org.xwiki.rendering.limits.RenderingLimitsScope;
+import org.xwiki.rendering.macro.MacroRenderingLimitExceededException;
 import org.xwiki.rendering.transformation.RenderingContext;
 import org.xwiki.script.ScriptContextManager;
 import org.xwiki.template.Template;
@@ -126,17 +130,8 @@ public class XWikiErrorBlockGenerator extends DefaultErrorBlockGenerator
             econtext.newProperty(ECONTEXT_MARKER).initial(true).declare();
 
             // Expose error information to the scripts through a $renderingerror variable
-            Map<String, Object> renderingerror = new HashMap<>();
-            renderingerror.put("messageId", messageId);
-            renderingerror.put("message", message);
-            renderingerror.put("description", description);
-            renderingerror.put("inline", inline);
-            if (message.getThrowable() != null) {
-                Throwable rootCause = ExceptionUtils.getRootCause(message.getThrowable());
-                renderingerror.put("rootCause", rootCause != null ? rootCause : message.getThrowable());
-                renderingerror.put("stackTrace", ExceptionUtils.getStackTrace(message.getThrowable()));
-            }
-            scriptContext.setAttribute(CONTEXT_ATTRIBUTE, renderingerror, ScriptContext.GLOBAL_SCOPE);
+            scriptContext.setAttribute(CONTEXT_ATTRIBUTE,
+                createRenderingError(messageId, message, description, inline), ScriptContext.GLOBAL_SCOPE);
 
             // Disable restricted context if set as the error generator template generally needs scripting
             if (this.renderingContext.isRestricted()
@@ -156,10 +151,21 @@ public class XWikiErrorBlockGenerator extends DefaultErrorBlockGenerator
                 block = templateManager.execute(template, inline);
             }
 
-            return block instanceof XDOM || block instanceof CompositeBlock ? block.getChildren()
+            List<Block> blocks = block instanceof XDOM || block instanceof CompositeBlock ? block.getChildren()
                 : Collections.singletonList(block);
+
+            return containsMacro(blocks) ? null : blocks;
         } catch (Exception e) {
-            this.logger.error("Failed to generate error rendering message", e);
+            if (isCausedByRenderingLimit(e)) {
+                // Rendering the message hit a limit itself, which happens when the reserve that is meant for the error
+                // messages of a rendering is used up, e.g. because a lot of them had to be generated. The exhausted
+                // limit has been reported already and the plain message of the parent class is used instead, so there
+                // is nothing to report here.
+                this.logger.debug("Failed to generate the error rendering message as a rendering limit has been"
+                    + " reached", e);
+            } else {
+                this.logger.error("Failed to generate error rendering message", e);
+            }
         } finally {
             // Get rid of temporary rendering context
             if (renderingContextPushed) {
@@ -174,6 +180,61 @@ public class XWikiErrorBlockGenerator extends DefaultErrorBlockGenerator
         }
 
         return null;
+    }
+
+    /**
+     * @param messageId the id of the message, if any
+     * @param message the message of the error
+     * @param description the description of the error
+     * @param inline whether the error is generated in an inline context
+     * @return the information about the error to expose to the template as {@code $renderingerror}
+     */
+    private Map<String, Object> createRenderingError(String messageId, Message message, Message description,
+        boolean inline)
+    {
+        Map<String, Object> renderingerror = new HashMap<>();
+        renderingerror.put("messageId", messageId);
+        renderingerror.put("message", message);
+        renderingerror.put("description", description);
+        renderingerror.put("inline", inline);
+
+        if (message.getThrowable() != null) {
+            Throwable rootCause = ExceptionUtils.getRootCause(message.getThrowable());
+            renderingerror.put("rootCause", rootCause != null ? rootCause : message.getThrowable());
+            renderingerror.put("stackTrace", ExceptionUtils.getStackTrace(message.getThrowable()));
+        }
+
+        return renderingerror;
+    }
+
+    /**
+     * @param throwable the failure of the template execution
+     * @return {@code true} when the template failed because a rendering limit has been reached
+     */
+    private boolean isCausedByRenderingLimit(Throwable throwable)
+    {
+        return ExceptionUtils.throwableOfType(throwable, MacroRenderingLimitExceededException.class) != null
+            || ExceptionUtils.throwableOfType(throwable, RecursionLimitExceededException.class) != null;
+    }
+
+    /**
+     * Check whether the result of the template still contains a macro that hasn't been executed, which happens when a
+     * rendering limit stopped the transformation of the template.
+     * <p>
+     * Such a macro would be executed by the transformation this error message is inserted into, outside of the reserve
+     * scope, so it would be stopped by the very limit that is being reported and get an error message of its own in the
+     * place of this one — an error about the {@code [box]} macro of the template instead of the failure that happened.
+     * The plain message of the parent class is used instead, as it contains no macro at all.
+     *
+     * @param blocks the blocks the template produced
+     * @return {@code true} when any of the blocks is or contains a macro that hasn't been executed
+     */
+    private boolean containsMacro(List<Block> blocks)
+    {
+        ClassBlockMatcher macroMatcher = new ClassBlockMatcher(MacroBlock.class);
+
+        return blocks.stream()
+            .anyMatch(block -> block.getFirstBlock(macroMatcher, Block.Axes.DESCENDANT_OR_SELF) != null);
     }
 
     @Override
